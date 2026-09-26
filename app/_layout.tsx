@@ -1,55 +1,83 @@
+// app/_layout.tsx
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { initDatabase } from '../src/database/client';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  const [dbListo, setDbListo] = useState(false);
 
   useEffect(() => {
-    if (loaded) {
+    if (fontError) throw fontError;
+  }, [fontError]);
+
+  useEffect(() => {
+    async function prepararBD() {
+      try {
+        await initDatabase();
+      } catch (e) {
+        console.error('[RootLayout Error] Error al inicializar SQLite:', e);
+      } finally {
+        setDbListo(true);
+      }
+    }
+
+    prepararBD();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && dbListo) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded, dbListo]);
 
-  if (!loaded) {
+  if (!fontsLoaded || !dbListo) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
+  );
 }
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+  const segments = useSegments();
+  const { cuentaId, cargando } = useAuth();
+
+  // Guardián de rutas reactivo
+  useEffect(() => {
+    if (cargando) return;
+
+    const enGrupoTabs = segments[0] === '(tabs)';
+
+    if (!cuentaId && enGrupoTabs) {
+      router.replace('/login');
+    } else if (cuentaId && segments[0] === 'login') {
+      router.replace('/(tabs)');
+    }
+  }, [cuentaId, cargando, segments]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
       </Stack>
     </ThemeProvider>
   );

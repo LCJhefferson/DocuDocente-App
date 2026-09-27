@@ -1,4 +1,5 @@
-//Gestión de datos personales del docente
+// src/services/perfilDocenteService.ts
+// Gestión de datos personales y académicos del docente en SQLite
 
 import { eq } from 'drizzle-orm';
 import 'react-native-get-random-values';
@@ -42,7 +43,11 @@ export class PerfilDocenteService {
    * Consulta el perfil docente por el ID de la cuenta activa
    */
   static async obtenerPorCuentaId(cuentaId: string): Promise<PerfilDocente | null> {
-    const resultados = await db.select().from(perfilesDocente).where(eq(perfilesDocente.cuentaId, cuentaId));
+    const resultados = await db
+      .select()
+      .from(perfilesDocente)
+      .where(eq(perfilesDocente.cuentaId, cuentaId));
+
     if (resultados.length === 0) return null;
 
     const perfil = resultados[0];
@@ -52,9 +57,30 @@ export class PerfilDocenteService {
       nombreCompleto: perfil.nombreCompleto,
       gradoAcademico: perfil.gradoAcademico,
       facultad: perfil.facultad,
-      departamento: perfil.departamento,
-      codigoInstitucional: perfil.codigoInstitucional,
-      avatarUri: perfil.avatarUri,
+      departamento: perfil.departamento ?? undefined,
+      codigoInstitucional: perfil.codigoInstitucional ?? undefined,
+      avatarUri: perfil.avatarUri ?? undefined,
     };
+  }
+
+  /**
+   * Actualiza la información del perfil docente ligado a una cuenta
+   * @param cuentaId ID único de la cuenta de autenticación activa
+   * @param datos Campos parciales a actualizar en el perfil
+   */
+  static async actualizarPerfil(
+    cuentaId: string,
+    datos: Partial<Omit<PerfilDocente, 'id' | 'cuentaId'>>
+  ): Promise<void> {
+    const ahora = new Date().toISOString();
+
+    // Actualizamos en la tabla perfiles_docente usando el filtro WHERE por cuenta_id
+    await db
+      .update(perfilesDocente)
+      .set({
+        ...datos,
+        actualizadoEn: ahora,
+      })
+      .where(eq(perfilesDocente.cuentaId, cuentaId));
   }
 }

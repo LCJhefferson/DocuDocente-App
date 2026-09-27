@@ -1,3 +1,4 @@
+// src/database/client.ts
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import * as schema from './schema';
@@ -5,46 +6,36 @@ import * as schema from './schema';
 const DB_NAME = 'docudocente.db';
 const expoDb = SQLite.openDatabaseSync(DB_NAME);
 
+// Habilitar claves foráneas en SQLite
 expoDb.execSync('PRAGMA foreign_keys = ON;');
 
 export const db = drizzle(expoDb, { schema });
 
-/////PARA LIMPIAR TABLAS ANTIGUAS./////////
+/**
+ * Función auxiliar de desarrollo para resetear la base de datos si cambias el esquema
+ */
+export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
+  try {
+    expoDb.execSync(`
+      DROP TABLE IF EXISTS evidencias;
+      DROP TABLE IF EXISTS actividades;
+      DROP TABLE IF EXISTS resultados_unidad;
+      DROP TABLE IF EXISTS informes;
+      DROP TABLE IF EXISTS plantillas;
+      DROP TABLE IF EXISTS cursos;
+      DROP TABLE IF EXISTS perfiles_docente;
+      DROP TABLE IF EXISTS cuentas_autenticacion;
+    `);
+    console.log('[DB DEV] Tablas eliminadas correctamente.');
+    await initDatabase();
+  } catch (error) {
+    console.error('[DB DEV Error] Error al reiniciar base de datos:', error);
+  }
+};
 
-
-// export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
-//   try {
-//     expoDb.execSync(`
-//       DROP TABLE IF EXISTS evidencias;
-//       DROP TABLE IF EXISTS actividades;
-//       DROP TABLE IF EXISTS resultados_unidad;
-//       DROP TABLE IF EXISTS informes;
-//       DROP TABLE IF EXISTS plantillas;
-//       DROP TABLE IF EXISTS perfiles_docente;
-//       DROP TABLE IF EXISTS cuentas_autenticacion;
-      
-//       -- Limpiar tablas antiguas con nombres en inglés
-//       DROP TABLE IF EXISTS evidences;
-//       DROP TABLE IF EXISTS activities;
-//       DROP TABLE IF EXISTS unit_results;
-//       DROP TABLE IF EXISTS reports;
-//       DROP TABLE IF EXISTS templates;
-//       DROP TABLE IF EXISTS teacher_profiles;
-//       DROP TABLE IF EXISTS auth_accounts;
-//       DROP TABLE IF EXISTS users;
-//     `);
-//     console.log('[DB DEV] Tablas antiguas eliminadas.');
-    
-//     // Recrea las tablas con el esquema nuevo en español
-//     await initDatabase();
-//   } catch (error) {
-//     console.error('[DB DEV Error] Error al reiniciar base de datos:', error);
-//   }
-// };
-
-
-////////////////////////////////////////////
-
+/**
+ * Inicialización de las tablas de SQLite en español con la tabla de cursos incluida
+ */
 export const initDatabase = async (): Promise<void> => {
   try {
     expoDb.execSync(`
@@ -70,6 +61,17 @@ export const initDatabase = async (): Promise<void> => {
         actualizado_en TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS cursos (
+        id TEXT PRIMARY KEY NOT NULL,
+        perfil_docente_id TEXT NOT NULL REFERENCES perfiles_docente(id) ON DELETE CASCADE,
+        nombre TEXT NOT NULL,
+        codigo TEXT,
+        ciclo TEXT NOT NULL,
+        semestre TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        actualizado_en TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS plantillas (
         id TEXT PRIMARY KEY NOT NULL,
         nombre_institucion TEXT NOT NULL,
@@ -83,6 +85,7 @@ export const initDatabase = async (): Promise<void> => {
       CREATE TABLE IF NOT EXISTS informes (
         id TEXT PRIMARY KEY NOT NULL,
         perfil_docente_id TEXT REFERENCES perfiles_docente(id) ON DELETE SET NULL,
+        curso_id TEXT REFERENCES cursos(id) ON DELETE CASCADE,
         plantilla_id TEXT REFERENCES plantillas(id) ON DELETE SET NULL,
         numero_informe TEXT NOT NULL,
         dirigido_a_nombre TEXT NOT NULL,
@@ -127,7 +130,7 @@ export const initDatabase = async (): Promise<void> => {
         creado_en TEXT NOT NULL
       );
     `);
-    console.log('[DB] Tablas SQLite inicializadas correctamente en español.');
+    console.log('[DB] Tablas SQLite inicializadas correctamente.');
   } catch (error) {
     console.error('[DB Error] Error al inicializar tablas:', error);
     throw error;

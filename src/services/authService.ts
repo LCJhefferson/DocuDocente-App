@@ -1,5 +1,5 @@
-//Gestión de credenciales y SecureStore
-
+// src/services/authService.ts
+// Gestión de credenciales y SecureStore
 import { eq } from 'drizzle-orm';
 import * as SecureStore from 'expo-secure-store';
 import 'react-native-get-random-values';
@@ -61,7 +61,7 @@ export class AuthService {
    */
   static async iniciarSesion(credenciales: CredencialesLogin): Promise<string> {
     const correoFormateado = credenciales.correoElectronico.trim().toLowerCase();
-    
+
     const resultados = await db
       .select()
       .from(cuentasAutenticacion)

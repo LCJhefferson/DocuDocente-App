@@ -63,11 +63,16 @@ function RootLayoutNav() {
   useEffect(() => {
     if (cargando) return;
 
-    const enGrupoTabs = segments[0] === '(tabs)';
+    // Evaluamos el primer segmento de la ruta activa
+    const primerSegmento = segments[0];
+    const enGrupoTabs = primerSegmento === '(tabs)';
+    
+    // Si el usuario no está en tabs ni en ninguna subruta interna, se considera en autenticación
+    const enPantallaAutenticacion = primerSegmento === 'login' || primerSegmento === undefined;
 
     if (!cuentaId && enGrupoTabs) {
       router.replace('/login');
-    } else if (cuentaId && segments[0] === 'login') {
+    } else if (cuentaId && enPantallaAutenticacion) {
       router.replace('/(tabs)');
     }
   }, [cuentaId, cargando, segments]);
@@ -77,7 +82,14 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
+        <Stack.Screen
+          name="modal"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            title: 'Perfil Docente',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

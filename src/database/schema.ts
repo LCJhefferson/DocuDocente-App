@@ -1,5 +1,6 @@
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+
 // 1. DOMINIO DE AUTENTICACIÓN (Cuentas y Seguridad)
 export const cuentasAutenticacion = sqliteTable('cuentas_autenticacion', {
   id: text('id').primaryKey(),
@@ -39,25 +40,7 @@ export const plantillas = sqliteTable('plantillas', {
   creadoEn: text('creado_en').notNull(),
 });
 
-// 4. INFORMES ACADÉMICOS CONSOLIDADOS
-export const informes = sqliteTable('informes', {
-  id: text('id').primaryKey(),
-  perfilDocenteId: text('perfil_docente_id').references(() => perfilesDocente.id, { onDelete: 'set null' }),
-  plantillaId: text('plantilla_id').references(() => plantillas.id, { onDelete: 'set null' }),
-  numeroInforme: text('numero_informe').notNull(),
-  dirigidoANombre: text('dirigido_a_nombre').notNull(),
-  dirigidoACargo: text('dirigido_a_cargo').notNull(),
-  remitenteNombre: text('remitente_nombre').notNull(), // Congela el nombre y grado al momento de crear el informe
-  asunto: text('asunto').notNull(),
-  fechaStr: text('fecha_str').notNull(),
-  nombreCurso: text('nombre_curso').notNull(),
-  ciclo: text('ciclo').notNull(),
-  semestre: text('semestre').notNull(),
-  totalEstudiantes: integer('total_estudiantes').notNull(),
-  estado: text('estado', { enum: ['BORRADOR', 'COMPLETADO', 'SINCRONIZADO'] }).default('BORRADOR').notNull(),
-  creadoEn: text('creado_en').notNull(),
-  actualizadoEn: text('actualizado_en').notNull(),
-});
+
 
 // 5. RESULTADOS ESTADÍSTICOS POR UNIDAD
 export const resultadosUnidad = sqliteTable('resultados_unidad', {
@@ -88,4 +71,39 @@ export const evidencias = sqliteTable('evidencias', {
   urlRemota: text('url_remota'),
   leyenda: text('leyenda'),
   creadoEn: text('creado_en').notNull(),
+});
+
+// 2.1 DOMINIO ACADÉMICO - CURSOS
+export const cursos = sqliteTable('cursos', {
+  id: text('id').primaryKey(),
+  perfilDocenteId: text('perfil_docente_id')
+    .references(() => perfilesDocente.id, { onDelete: 'cascade' })
+    .notNull(),
+  nombre: text('nombre').notNull(),                 // Ej: Desarrollo de Aplicaciones Móviles
+  codigo: text('codigo'),                          // Ej: IF-501
+  ciclo: text('ciclo').notNull(),                   // Ej: VII
+  semestre: text('semestre').notNull(),             // Ej: 2026-I
+  creadoEn: text('creado_en').notNull(),
+  actualizadoEn: text('actualizado_en').notNull(),
+});
+
+// Actualización en informes para vincularlo a un curso
+export const informes = sqliteTable('informes', {
+  id: text('id').primaryKey(),
+  perfilDocenteId: text('perfil_docente_id').references(() => perfilesDocente.id, { onDelete: 'set null' }),
+  cursoId: text('curso_id').references(() => cursos.id, { onDelete: 'cascade' }),
+  plantillaId: text('plantilla_id').references(() => plantillas.id, { onDelete: 'set null' }),
+  numeroInforme: text('numero_informe').notNull(),
+  dirigidoANombre: text('dirigido_a_nombre').notNull(),
+  dirigidoACargo: text('dirigido_a_cargo').notNull(),
+  remitenteNombre: text('remitente_nombre').notNull(),
+  asunto: text('asunto').notNull(),
+  fechaStr: text('fecha_str').notNull(),
+  nombreCurso: text('nombre_curso').notNull(),
+  ciclo: text('ciclo').notNull(),
+  semestre: text('semestre').notNull(),
+  totalEstudiantes: integer('total_estudiantes').notNull(),
+  estado: text('estado', { enum: ['BORRADOR', 'COMPLETADO', 'SINCRONIZADO'] }).default('BORRADOR').notNull(),
+  creadoEn: text('creado_en').notNull(),
+  actualizadoEn: text('actualizado_en').notNull(),
 });

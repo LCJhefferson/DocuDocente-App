@@ -1,21 +1,21 @@
-import { useRouter } from 'expo-router';
+// app/login.tsx
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { AuthService } from '../src/services/authService';
+import { useAuth } from '../src/context/AuthContext';
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const { iniciarSesion, registrarse } = useAuth();
   const [esModoRegistro, setEsModoRegistro] = useState(false);
   const [cargando, setCargando] = useState(false);
 
@@ -42,7 +42,7 @@ export default function LoginScreen() {
           return;
         }
 
-        await AuthService.registrarse({
+        await registrarse({
           correoElectronico: correo,
           contrasena: contrasena,
           nombreCompleto: nombreCompleto,
@@ -52,13 +52,12 @@ export default function LoginScreen() {
         });
         Alert.alert('¡Bienvenido!', 'Su perfil docente ha sido registrado con éxito.');
       } else {
-        await AuthService.iniciarSesion({
+        await iniciarSesion({
           correoElectronico: correo,
           contrasena: contrasena,
         });
       }
-
-      router.replace('/(tabs)');
+      // La navegación hacia /(tabs) la maneja automáticamente el useEffect en _layout.tsx
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Ocurrió un error inesperado.');
     } finally {

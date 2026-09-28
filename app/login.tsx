@@ -1,10 +1,13 @@
-// app/login.tsx
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router'; // Para navegación a registro si aplica
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,200 +15,243 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Cargando } from '../src/components/Cargando';
 import { useAuth } from '../src/context/AuthContext';
 
 export default function LoginScreen() {
-  const { iniciarSesion, registrarse } = useAuth();
-  const [esModoRegistro, setEsModoRegistro] = useState(false);
-  const [cargando, setCargando] = useState(false);
-
-  // Campos de formulario
-  const [correo, setCorreo] = useState('');
+  const [usuario, setUsuario] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [nombreCompleto, setNombreCompleto] = useState('');
-  const [gradoAcademico, setGradoAcademico] = useState('Mg.');
-  const [facultad, setFacultad] = useState('FISME');
-  const [departamento, setDepartamento] = useState('');
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
+  const [procesando, setProcesando] = useState(false);
 
-  const manejarAutenticacion = async () => {
-    if (!correo || !contrasena) {
-      Alert.alert('Atención', 'Por favor complete el correo y la contraseña.');
+  const { iniciarSesion } = useAuth();
+  const router = useRouter();
+
+  const handleLogin = async () => {
+    if (!usuario.trim() || !contrasena.trim()) {
+      Alert.alert('Atención', 'Por favor ingrese su usuario y contraseña.');
       return;
     }
 
-    setCargando(true);
     try {
-      if (esModoRegistro) {
-        if (!nombreCompleto || !facultad) {
-          Alert.alert('Atención', 'Ingrese su nombre completo y facultad.');
-          setCargando(false);
-          return;
-        }
-
-        await registrarse({
-          correoElectronico: correo,
-          contrasena: contrasena,
-          nombreCompleto: nombreCompleto,
-          gradoAcademico: gradoAcademico,
-          facultad: facultad,
-          departamento: departamento,
-        });
-        Alert.alert('¡Bienvenido!', 'Su perfil docente ha sido registrado con éxito.');
-      } else {
-        await iniciarSesion({
-          correoElectronico: correo,
-          contrasena: contrasena,
-        });
-      }
-      // La navegación hacia /(tabs) la maneja automáticamente el useEffect en _layout.tsx
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Ocurrió un error inesperado.');
-    } finally {
-      setCargando(false);
+      setProcesando(true);
+      await iniciarSesion({
+        correoElectronico: usuario.trim(),
+        contrasena: contrasena.trim(),
+      });
+    } catch (error) {
+      setProcesando(false);
+      Alert.alert(
+        'Error de Autenticación',
+        'Credenciales incorrectas o problemas al conectar con la base de datos local.'
+      );
     }
   };
 
+  const handleOlvideContrasena = () => {
+    Alert.alert('Recuperación', 'Póngase en contacto con el administrador del sistema.');
+  };
+
+  const handleCrearCuenta = () => {
+    router.push('/registro');
+  };
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.contenedorPadre}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.encabezado}>
-          <Text style={styles.titulo}>DocuDocente</Text>
-          <Text style={styles.subtitulo}>
-            {esModoRegistro ? 'Registro de Perfil Docente' : 'Control de Acceso'}
-          </Text>
-        </View>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.contenedor}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Logo Principal con el Arrendajo y Nombre */}
+          <View style={styles.contenedorLogo}>
+            <Image
+              source={require('../assets/images/arrendajo_posado.png')} // O cambia por '../assets/images/logo_docudocente.png'
+              style={styles.logoImagen}
+              resizeMode="contain"
+            />
+          </View>
 
-        <View style={styles.tarjetaFormulario}>
-          {esModoRegistro && (
-            <>
-              <Text style={styles.etiqueta}>Nombre Completo *</Text>
+          {/* Formulario de Login */}
+          <View style={styles.formulario}>
+            {/* Campo Usuario / Email */}
+            <View style={styles.grupoInput}>
+              <Text style={styles.label}>Email Address</Text>
               <TextInput
-                style={styles.entradaTexto}
-                placeholder="Ej: Heling Kristtel Masgo Ventura"
-                value={nombreCompleto}
-                onChangeText={setNombreCompleto}
+                style={styles.input}
+                placeholder=""
+                value={usuario}
+                onChangeText={setUsuario}
+                autoCapitalize="none"
+                keyboardType="email-address"
               />
+            </View>
 
-              <View style={styles.filaCampos}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.etiqueta}>Grado *</Text>
-                  <TextInput
-                    style={styles.entradaTexto}
-                    placeholder="Mg. / Dr. / Lic."
-                    value={gradoAcademico}
-                    onChangeText={setGradoAcademico}
+            {/* Campo Contraseña */}
+            <View style={styles.grupoInput}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.contenedorPassword}>
+                <TextInput
+                  style={[styles.input, styles.inputPassword]}
+                  placeholder=""
+                  value={contrasena}
+                  onChangeText={setContrasena}
+                  secureTextEntry={!mostrarContrasena}
+                />
+                <TouchableOpacity
+                  onPress={() => setMostrarContrasena(!mostrarContrasena)}
+                  style={styles.iconoOjo}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={mostrarContrasena ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#8E9AA0"
                   />
-                </View>
-
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={styles.etiqueta}>Facultad *</Text>
-                  <TextInput
-                    style={styles.entradaTexto}
-                    placeholder="Ej: FISME"
-                    value={facultad}
-                    onChangeText={setFacultad}
-                  />
-                </View>
+                </TouchableOpacity>
               </View>
+            </View>
 
-              <Text style={styles.etiqueta}>Departamento Académico</Text>
-              <TextInput
-                style={styles.entradaTexto}
-                placeholder="Ej: Ingeniería de Sistemas"
-                value={departamento}
-                onChangeText={setDepartamento}
-              />
-            </>
-          )}
+            {/* Botón Iniciar Sesión */}
+            <TouchableOpacity
+              style={styles.botonLogin}
+              onPress={handleLogin}
+              disabled={procesando}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.textoBoton}>Iniciar Sesión</Text>
+            </TouchableOpacity>
 
-          <Text style={styles.etiqueta}>Correo Institucional *</Text>
-          <TextInput
-            style={styles.entradaTexto}
-            placeholder="docente@untrm.edu.pe"
-            value={correo}
-            onChangeText={setCorreo}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+            {/* Enlaces de Acción */}
+            <View style={styles.contenedorEnlaces}>
+              <TouchableOpacity onPress={handleOlvideContrasena} activeOpacity={0.7}>
+                <Text style={styles.textoOlvide}>¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
 
-          <Text style={styles.etiqueta}>Contraseña *</Text>
-          <TextInput
-            style={styles.entradaTexto}
-            placeholder="••••••••"
-            value={contrasena}
-            onChangeText={setContrasena}
-            secureTextEntry
-          />
+              <View style={styles.contenedorRegistro}>
+                <Text style={styles.textoSinCuenta}>no tengo cuenta? </Text>
+                <TouchableOpacity onPress={handleCrearCuenta} activeOpacity={0.7}>
+                  <Text style={styles.textoCrearCuenta}>Crear cuenta</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
 
-          <TouchableOpacity
-            style={styles.botonPrincipal}
-            onPress={manejarAutenticacion}
-            disabled={cargando}
-          >
-            {cargando ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.textoBotonPrincipal}>
-                {esModoRegistro ? 'Crear Perfil e Iniciar' : 'Ingresar'}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.botonSecundario}
-            onPress={() => setEsModoRegistro(!esModoRegistro)}
-          >
-            <Text style={styles.textoBotonSecundario}>
-              {esModoRegistro
-                ? '¿Ya tienes cuenta? Inicia sesión aquí'
-                : '¿Nuevo docente? Registra tu cuenta aquí'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        {/* Overlay de Carga */}
+        <Modal visible={procesando} transparent animationType="fade">
+          <View style={styles.overlayCarga}>
+            <Cargando mensaje="Autenticando y sincronizando expedientes..." />
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  contenedorPadre: { flex: 1, backgroundColor: '#f2f2f7' },
-  scrollContainer: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  encabezado: { alignItems: 'center', marginBottom: 24 },
-  titulo: { fontSize: 32, fontWeight: '800', color: '#003366', letterSpacing: 0.5 },
-  subtitulo: { fontSize: 15, color: '#666', marginTop: 4 },
-  tarjetaFormulario: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  etiqueta: { fontSize: 13, fontWeight: '600', color: '#333', marginBottom: 6 },
-  entradaTexto: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e1e4e8',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
+  contenedor: {
+    flex: 1,
   },
-  filaCampos: { flexDirection: 'row', justifyContent: 'space-between' },
-  botonPrincipal: {
-    backgroundColor: '#003366',
-    borderRadius: 8,
-    padding: 15,
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingBottom: 24,
+  },
+  contenedorLogo: {
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginBottom: 40,
+    marginTop: 20,
   },
-  textoBotonPrincipal: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
-  botonSecundario: { marginTop: 18, alignItems: 'center' },
-  textoBotonSecundario: { color: '#003366', fontSize: 14, fontWeight: '500' },
+  logoImagen: {
+    width: '100%',
+    height: 180,
+  },
+  formulario: {
+    width: '100%',
+  },
+  grupoInput: {
+    marginBottom: 28,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#83968C', // Gris verdoso limpio
+    marginBottom: 4,
+  },
+  input: {
+    borderBottomWidth: 1.2,
+    borderBottomColor: '#A8B9C2', // Línea inferior estilizada
+    fontSize: 16,
+    color: '#1C252C',
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+  },
+  contenedorPassword: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  inputPassword: {
+    paddingRight: 36,
+  },
+  iconoOjo: {
+    position: 'absolute',
+    right: 0,
+    bottom: 8,
+    padding: 4,
+  },
+  botonLogin: {
+    backgroundColor: '#1E88E5', // Azul primario vibrante
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+    elevation: 3,
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  textoBoton: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  contenedorEnlaces: {
+    alignItems: 'center',
+    marginTop: 36,
+    gap: 16,
+  },
+  textoOlvide: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#212631',
+  },
+  contenedorRegistro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  textoSinCuenta: {
+    fontSize: 14,
+    color: '#8A999F',
+  },
+  textoCrearCuenta: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#124874', // Azul marino oscuro para resaltar el enlace
+  },
+  overlayCarga: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
 });

@@ -9,7 +9,7 @@ import Colors from '@/constants/Colors';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme()?? 'light';
   const { cerrarSesion } = useAuth();
 
   // Función para confirmar el cierre de sesión

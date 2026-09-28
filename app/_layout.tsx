@@ -59,15 +59,11 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { cuentaId, cargando } = useAuth();
 
-  // Guardián de rutas reactivo
   useEffect(() => {
     if (cargando) return;
 
-    // Evaluamos el primer segmento de la ruta activa
     const primerSegmento = segments[0];
     const enGrupoTabs = primerSegmento === '(tabs)';
-    
-    // Si el usuario no está en tabs ni en ninguna subruta interna, se considera en autenticación
     const enPantallaAutenticacion = primerSegmento === 'login' || primerSegmento === undefined;
 
     if (!cuentaId && enGrupoTabs) {

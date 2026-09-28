@@ -7,7 +7,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../src/services/authService';
 
 export default function RegistroScreen() {
@@ -22,31 +22,26 @@ export default function RegistroScreen() {
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [cargando, setCargando] = useState(false);
 
-  // Paso 1: Datos Básicos
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [gradoAcademico, setGradoAcademico] = useState('');
 
-  // Paso 2: Datos Institucionales
   const [facultad, setFacultad] = useState('');
   const [departamento, setDepartamento] = useState('');
   const [codigoInstitucional, setCodigoInstitucional] = useState('');
 
-  // Paso 3: Credenciales
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
 
-  // Visibilidad de contraseñas
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [mostrarConfirmarContrasena, setMostrarConfirmarContrasena] = useState(false);
 
-  // Mapeo dinámico de imágenes según el paso activo
   const obtenerImagenPaso = () => {
     switch (paso) {
       case 1:
-        return require('../assets/images/paso1_huevo.png'); 
+        return require('../assets/images/paso1_huevo.png');
       case 2:
-        return require('../assets/images/paso2_polluelo.png'); 
+        return require('../assets/images/paso2_polluelo.png');
       case 3:
         return require('../assets/images/paso3_ave.png');
     }
@@ -356,7 +351,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1.2,
-    borderBottomColor: '#1E88E5', // Azul brillante según diseño
+    borderBottomColor: '#1E88E5',
     fontSize: 15,
     color: '#1C252C',
     paddingVertical: 6,

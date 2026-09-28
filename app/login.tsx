@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router'; // Para navegación a registro si aplica
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Cargando } from '../src/components/Cargando';
 import { useAuth } from '../src/context/AuthContext';
 
@@ -60,7 +60,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.contenedor}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -70,7 +70,7 @@ export default function LoginScreen() {
           {/* Logo Principal con el Arrendajo y Nombre */}
           <View style={styles.contenedorLogo}>
             <Image
-              source={require('../assets/images/arrendajo_posado.png')} // O cambia por '../assets/images/logo_docudocente.png'
+              source={require('../assets/images/arrendajo_posado.png')}
               style={styles.logoImagen}
               resizeMode="contain"
             />
@@ -134,7 +134,11 @@ export default function LoginScreen() {
 
               <View style={styles.contenedorRegistro}>
                 <Text style={styles.textoSinCuenta}>no tengo cuenta? </Text>
-                <TouchableOpacity onPress={handleCrearCuenta} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={handleCrearCuenta}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
                   <Text style={styles.textoCrearCuenta}>Crear cuenta</Text>
                 </TouchableOpacity>
               </View>
@@ -170,28 +174,28 @@ const styles = StyleSheet.create({
   contenedorLogo: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
-    marginTop: 20,
+    marginBottom: 30,
+    marginTop: 10,
   },
   logoImagen: {
     width: '100%',
-    height: 180,
+    height: 170,
   },
   formulario: {
     width: '100%',
   },
   grupoInput: {
-    marginBottom: 28,
+    marginBottom: 24,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#83968C', // Gris verdoso limpio
+    color: '#83968C',
     marginBottom: 4,
   },
   input: {
     borderBottomWidth: 1.2,
-    borderBottomColor: '#A8B9C2', // Línea inferior estilizada
+    borderBottomColor: '#A8B9C2',
     fontSize: 16,
     color: '#1C252C',
     paddingVertical: 8,
@@ -211,7 +215,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   botonLogin: {
-    backgroundColor: '#1E88E5', // Azul primario vibrante
+    backgroundColor: '#1E88E5',
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
@@ -229,7 +233,7 @@ const styles = StyleSheet.create({
   },
   contenedorEnlaces: {
     alignItems: 'center',
-    marginTop: 36,
+    marginTop: 32,
     gap: 16,
   },
   textoOlvide: {
@@ -240,6 +244,7 @@ const styles = StyleSheet.create({
   contenedorRegistro: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4,
   },
   textoSinCuenta: {
     fontSize: 14,
@@ -248,7 +253,7 @@ const styles = StyleSheet.create({
   textoCrearCuenta: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#124874', // Azul marino oscuro para resaltar el enlace
+    color: '#124874',
   },
   overlayCarga: {
     flex: 1,

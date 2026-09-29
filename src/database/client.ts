@@ -1,4 +1,3 @@
-// src/database/client.ts
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import * as schema from './schema';
@@ -12,7 +11,7 @@ expoDb.execSync('PRAGMA foreign_keys = ON;');
 export const db = drizzle(expoDb, { schema });
 
 /**
- * Función auxiliar de desarrollo para resetear la base de datos si cambias el esquema
+ * Función auxiliar de desarrollo para resetear la base de datos
  */
 export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
   try {
@@ -34,7 +33,7 @@ export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
 };
 
 /**
- * Inicialización de las tablas de SQLite en español con la tabla de cursos incluida
+ * Inicialización de las tablas de SQLite y siembra de datos base
  */
 export const initDatabase = async (): Promise<void> => {
   try {
@@ -123,13 +122,36 @@ export const initDatabase = async (): Promise<void> => {
 
       CREATE TABLE IF NOT EXISTS evidencias (
         id TEXT PRIMARY KEY NOT NULL,
-        actividad_id TEXT NOT NULL REFERENCES actividades(id) ON DELETE CASCADE,
-        ruta_archivo_local TEXT NOT NULL,
+        tipo_general TEXT NOT NULL DEFAULT 'ACADEMICA',
+        curso_id TEXT REFERENCES cursos(id) ON DELETE CASCADE,
+        actividad_id TEXT REFERENCES actividades(id) ON DELETE CASCADE,
+        nombre_actividad TEXT NOT NULL,
+        descripcion TEXT,
+        unidad TEXT,
+        tipo_actividad TEXT,
+        ruta_archivo_local TEXT,
         url_remota TEXT,
+        tipo_archivo TEXT DEFAULT 'IMAGE',
         leyenda TEXT,
-        creado_en TEXT NOT NULL
+        creado_en TEXT NOT NULL,
+        actualizado_en TEXT NOT NULL
       );
     `);
+
+    // AUTO-SIEMBRA: Garantiza que la cuenta y perfil por defecto existan en SQLite
+    const perfiles = expoDb.getAllSync('SELECT id FROM perfiles_docente LIMIT 1;');
+    if (perfiles.length === 0) {
+      const ahora = new Date().toISOString();
+      expoDb.execSync(`
+        INSERT OR IGNORE INTO cuentas_autenticacion (id, correo_electronico, contrasena_hash, es_activo, creado_en, actualizado_en)
+        VALUES ('cuenta_default', 'docente@ejemplo.com', '123456', 1, '${ahora}', '${ahora}');
+
+        INSERT OR IGNORE INTO perfiles_docente (id, cuenta_id, nombre_completo, grado_academico, facultad, creado_en, actualizado_en)
+        VALUES ('perfil_default', 'cuenta_default', 'Docente General', 'Mg.', 'Ingeniería', '${ahora}', '${ahora}');
+      `);
+      console.log('[DB] Perfil docente por defecto creado en SQLite.');
+    }
+
     console.log('[DB] Tablas SQLite inicializadas correctamente.');
   } catch (error) {
     console.error('[DB Error] Error al inicializar tablas:', error);

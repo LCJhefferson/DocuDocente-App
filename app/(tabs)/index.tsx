@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,21 +34,24 @@ export default function CursosScreen() {
   const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
   const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
-  useEffect(() => {
-    cargarCursos();
-  }, [busqueda, perfilDocente]);
-
-  const cargarCursos = async () => {
-    if (!perfilDocente) return;
+  const cargarCursos = useCallback(async () => {
     try {
-      const data = await CursoService.obtenerCursosPorDocente(perfilDocente.id, busqueda);
+      setCargando(true);
+      // Usar perfilDocente?.id o recurrir al id sembrado si no hay sesión
+      const docenteId = perfilDocente?.id || 'perfil_default';
+      const data = await CursoService.obtenerCursosPorDocente(docenteId, busqueda);
       setCursosList(data);
     } catch (error) {
       console.error('Error al cargar cursos:', error);
     } finally {
+      // Garantiza que la pantalla deje de cargar siempre
       setCargando(false);
     }
-  };
+  }, [busqueda, perfilDocente]);
+
+  useEffect(() => {
+    cargarCursos();
+  }, [cargarCursos]);
 
   const manejarCrearCurso = async (datos: {
     nombre: string;
@@ -56,12 +59,16 @@ export default function CursosScreen() {
     ciclo: string;
     semestre: string;
   }) => {
-    if (!perfilDocente) return;
-    await CursoService.crearCurso({
-      perfilDocenteId: perfilDocente.id,
-      ...datos,
-    });
-    cargarCursos();
+    const docenteId = perfilDocente?.id || 'perfil_default';
+    try {
+      await CursoService.crearCurso({
+        perfilDocenteId: docenteId,
+        ...datos,
+      });
+      cargarCursos();
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo crear el curso en la base de datos.');
+    }
   };
 
   const manejarActualizarCurso = async (
@@ -129,7 +136,7 @@ export default function CursosScreen() {
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
-          onPress={() => Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || ''}`)}
+          onPress={() => Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)}
         >
           <Ionicons name="person-outline" size={24} color="#1C252C" />
         </TouchableOpacity>

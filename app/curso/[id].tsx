@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     ScrollView,
@@ -13,15 +14,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
+import { dropAndRecreateDatabaseDev } from '../../src/database/client';
+import { evidenciaService } from '../../src/services/evidenciaService';
 
-interface EvidenciaLocal {
+interface EvidenciaDB {
   id: string;
   nombreActividad: string;
-  descripcion?: string;
-  tipoActividad: string;
-  fecha: string;
-  unidad: string;
-  archivoUri?: string;
+  descripcion?: string | null;
+  tipoActividad?: string | null;
+  unidad?: string | null;
+  rutaArchivoLocal?: string | null;
+  creadoEn: string;
 }
 
 const UNIDADES = ['Unidad 1', 'Unidad 2', 'Unidad 3'];
@@ -30,62 +33,98 @@ export default function EvidenciasCursoScreen() {
   const router = useRouter();
   const { id, nombre } = useLocalSearchParams<{ id: string; nombre?: string }>();
 
-  // Estados principales
+  // Estados
   const [unidadSeleccionada, setUnidadSeleccionada] = useState<string>('Unidad 1');
   const [busqueda, setBusqueda] = useState<string>('');
   const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [cargando, setCargando] = useState<boolean>(true);
+  const [evidencias, setEvidencias] = useState<EvidenciaDB[]>([]);
 
-  // Lista de evidencias cargadas
-  const [evidencias, setEvidencias] = useState<EvidenciaLocal[]>([
-    {
-      id: '1',
-      nombreActividad: 'Desarrollo de aplicaciones Moviles',
-      descripcion: 'Clase sobre React Navigation',
-      tipoActividad: 'Sesión de clase',
-      fecha: '10/08/2026',
-      unidad: 'Unidad 1',
-    },
-  ]);
+  // Cargar evidencias de la base de datos SQLite
+  const cargarEvidenciasBD = useCallback(async () => {
+    if (!id) return;
+    try {
+      setCargando(true);
+      const resultado = await evidenciaService.obtenerPorCursoYUnidad(id, unidadSeleccionada);
+      setEvidencias(resultado);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudieron cargar las evidencias de la base de datos.');
+    } finally {
+      setCargando(false);
+    }
+  }, [id, unidadSeleccionada]);
 
-  // Manejador para guardar desde el nuevo Modal
-  const handleGuardarEvidencia = (datos: {
+  useEffect(() => {
+    cargarEvidenciasBD();
+  }, [cargarEvidenciasBD]);
+
+  // Manejador para guardar evidencia en SQLite
+  const handleGuardarEvidencia = async (datos: {
     nombreActividad: string;
     descripcion: string;
     tipoActividad: string;
     archivo: { uri: string; name: string } | null;
   }) => {
-    const nueva: EvidenciaLocal = {
-      id: Date.now().toString(),
-      nombreActividad: datos.nombreActividad,
-      descripcion: datos.descripcion,
-      tipoActividad: datos.tipoActividad,
-      fecha: new Date().toLocaleDateString('es-ES'),
-      unidad: unidadSeleccionada,
-      archivoUri: datos.archivo?.uri,
-    };
+    if (!id) {
+      Alert.alert('Error', 'No se encontró el ID del curso.');
+      return;
+    }
 
-    setEvidencias((prev) => [nueva, ...prev]);
-    Alert.alert('Éxito', 'Evidencia guardada correctamente.');
+    try {
+      await evidenciaService.crearEvidencia({
+        tipoGeneral: 'ACADEMICA',
+        cursoId: id,
+        unidad: unidadSeleccionada,
+        nombreActividad: datos.nombreActividad,
+        descripcion: datos.descripcion,
+        tipoActividad: datos.tipoActividad,
+        rutaArchivoLocal: datos.archivo?.uri,
+      });
+
+      Alert.alert('Éxito', 'Evidencia guardada correctamente en la base de datos.');
+      cargarEvidenciasBD();
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un problema al guardar la evidencia.');
+    }
   };
 
+  // Eliminar evidencia de SQLite
   const eliminarEvidencia = (evidenciaId: string) => {
     Alert.alert('Eliminar Evidencia', '¿Estás seguro de que deseas eliminar esta evidencia?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
         style: 'destructive',
-        onPress: () => {
-          setEvidencias((prev) => prev.filter((item) => item.id !== evidenciaId));
+        onPress: async () => {
+          try {
+            await evidenciaService.eliminarEvidencia(evidenciaId);
+            cargarEvidenciasBD();
+          } catch (error) {
+            Alert.alert('Error', 'No se pudo eliminar la evidencia.');
+          }
         },
       },
     ]);
   };
 
-  const evidenciasFiltradas = evidencias.filter((item) => {
-    const coincideUnidad = item.unidad === unidadSeleccionada;
-    const coincideTexto = item.nombreActividad.toLowerCase().includes(busqueda.toLowerCase());
-    return coincideUnidad && coincideTexto;
-  });
+  // Botón dev opcional para reiniciar tablas en caso de cambios en el esquema
+  const handleResetearDB = () => {
+    Alert.alert('Resetear DB', '¿Deseas recrear las tablas de SQLite?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Reiniciar',
+        style: 'destructive',
+        onPress: async () => {
+          await dropAndRecreateDatabaseDev();
+          cargarEvidenciasBD();
+        },
+      },
+    ]);
+  };
+
+  const evidenciasFiltradas = evidencias.filter((item) =>
+    item.nombreActividad.toLowerCase().includes(busqueda.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.contenedorPadre} edges={['top', 'left', 'right']}>
@@ -100,11 +139,8 @@ export default function EvidenciasCursoScreen() {
         </Text>
 
         <View style={styles.headerAcciones}>
-          <TouchableOpacity style={styles.botonIconoHeader}>
-            <Ionicons name="person-outline" size={22} color="#0F172A" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.botonIconoHeader}>
-            <Ionicons name="log-out-outline" size={24} color="#0F172A" />
+          <TouchableOpacity style={styles.botonIconoHeader} onPress={handleResetearDB}>
+            <Ionicons name="refresh-outline" size={22} color="#0F172A" />
           </TouchableOpacity>
         </View>
       </View>
@@ -134,7 +170,7 @@ export default function EvidenciasCursoScreen() {
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
         <TextInput
           style={styles.inputBuscador}
-          placeholder="Buscar curso"
+          placeholder="Buscar evidencia"
           placeholderTextColor="#94A3B8"
           value={busqueda}
           onChangeText={setBusqueda}
@@ -149,8 +185,12 @@ export default function EvidenciasCursoScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* LISTA DE EVIDENCIAS */}
-      {evidenciasFiltradas.length === 0 ? (
+      {/* CONTENIDO LISTA O CARGANDO */}
+      {cargando ? (
+        <View style={styles.vacioContenedor}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      ) : evidenciasFiltradas.length === 0 ? (
         <View style={styles.vacioContenedor}>
           <Ionicons name="folder-open-outline" size={48} color="#94A3B8" />
           <Text style={styles.textoVacio}>No hay evidencias registradas en esta unidad.</Text>
@@ -167,14 +207,12 @@ export default function EvidenciasCursoScreen() {
                 <Text style={styles.tituloEvidencia} numberOfLines={2}>
                   {item.nombreActividad}
                 </Text>
-                <Text style={styles.fechaEvidencia}>{item.fecha}</Text>
+                <Text style={styles.fechaEvidencia}>
+                  {new Date(item.creadoEn).toLocaleDateString('es-ES')} · {item.tipoActividad || 'General'}
+                </Text>
               </View>
 
               <View style={styles.accionesEvidencia}>
-                <TouchableOpacity style={styles.botonAccionIcono}>
-                  <Ionicons name="pencil" size={18} color="#0F172A" />
-                </TouchableOpacity>
-
                 <TouchableOpacity
                   style={styles.botonAccionIcono}
                   onPress={() => eliminarEvidencia(item.id)}
@@ -191,7 +229,7 @@ export default function EvidenciasCursoScreen() {
       <ModalSubirEvidencia
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        nombreCurso={nombre || 'Desarrollo de aplicaciones Móviles'}
+        nombreCurso={nombre || 'Curso'}
         unidadActual={unidadSeleccionada}
         onGuardar={handleGuardarEvidencia}
       />

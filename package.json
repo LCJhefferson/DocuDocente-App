@@ -4,10 +4,13 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@react-navigation/bottom-tabs": "^7.19.2",
+    "@react-navigation/native": "^7.4.1",
     "docx": "^9.7.2",
     "drizzle-orm": "^0.45.3",
     "expo": "~57.0.25",
     "expo-constants": "~57.0.19",
+    "expo-document-picker": "~57.0.2",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-image-picker": "~57.0.20",

@@ -5,6 +5,13 @@ import { db } from '../database/client';
 import { cursos } from '../database/schema';
 import { Curso, EntradaCrearCurso } from '../models/Curso';
 
+export interface EntradaActualizarCurso {
+  nombre: string;
+  codigo?: string;
+  ciclo: string;
+  semestre: string;
+}
+
 export class CursoService {
   /**
    * Obtiene todos los cursos asignados a un docente
@@ -61,5 +68,32 @@ export class CursoService {
       semestre: entrada.semestre,
       creadoEn: ahora,
     };
+  }
+
+  /**
+   * Actualiza los datos de un curso existente
+   */
+  static async actualizarCurso(cursoId: string, entrada: EntradaActualizarCurso): Promise<void> {
+    const ahora = new Date().toISOString();
+
+    await db
+      .update(cursos)
+      .set({
+        nombre: entrada.nombre.trim(),
+        codigo: entrada.codigo?.trim() || null,
+        ciclo: entrada.ciclo.trim(),
+        semestre: entrada.semestre.trim(),
+        actualizadoEn: ahora,
+      })
+      .where(eq(cursos.id, cursoId));
+  }
+
+  /**
+   * Elimina un curso por su ID
+   */
+  static async eliminarCurso(cursoId: string): Promise<void> {
+    await db
+      .delete(cursos)
+      .where(eq(cursos.id, cursoId));
   }
 }

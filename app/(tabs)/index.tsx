@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -13,24 +13,26 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { CursoCard } from '../../src/components/cursos/CursoCard';
+import { ModalCrearCurso } from '../../src/components/modals/ModalCrearCurso';
+import { ModalOpcionesCurso } from '../../src/components/modals/ModalOpcionesCurso';
 import { useAuth } from '../../src/context/AuthContext';
 import { Curso } from '../../src/models/Curso';
 import { CursoService } from '../../src/services/cursoService';
 
 export default function CursosScreen() {
+  const router = useRouter();
   const { perfilDocente, cerrarSesion } = useAuth();
 
   const [cursosList, setCursosList] = useState<Curso[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
 
-  // Estados Modal
-  const [modalVisible, setModalVisible] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [nombre, setNombre] = useState('');
-  const [codigo, setCodigo] = useState('');
-  const [ciclo, setCiclo] = useState('');
-  const [semestre, setSemestre] = useState('');
+  // Modales
+  const [modalCrearVisible, setModalCrearVisible] = useState(false);
+  const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
+  const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
   useEffect(() => {
     cargarCursos();
@@ -48,34 +50,70 @@ export default function CursosScreen() {
     }
   };
 
-  const manejarCrearCurso = async () => {
-    if (!nombre.trim() || !ciclo.trim() || !semestre.trim()) {
-      Alert.alert('Atención', 'Por favor complete el nombre, ciclo y semestre.');
-      return;
-    }
+  const manejarCrearCurso = async (datos: {
+    nombre: string;
+    codigo: string;
+    ciclo: string;
+    semestre: string;
+  }) => {
     if (!perfilDocente) return;
+    await CursoService.crearCurso({
+      perfilDocenteId: perfilDocente.id,
+      ...datos,
+    });
+    cargarCursos();
+  };
 
-    setGuardando(true);
-    try {
-      await CursoService.crearCurso({
-        perfilDocenteId: perfilDocente.id,
-        nombre: nombre.trim(),
-        codigo: codigo.trim(),
-        ciclo: ciclo.trim(),
-        semestre: semestre.trim(),
-      });
-
-      setNombre('');
-      setCodigo('');
-      setCiclo('');
-      setSemestre('');
-      setModalVisible(false);
-      cargarCursos();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo crear el curso.');
-    } finally {
-      setGuardando(false);
+  const manejarActualizarCurso = async (
+    cursoId: string,
+    datos: { nombre: string; codigo: string; ciclo: string; semestre: string }
+  ) => {
+    await CursoService.actualizarCurso(cursoId, datos);
+    if (cursoSeleccionado) {
+      setCursoSeleccionado({ ...cursoSeleccionado, ...datos });
     }
+    cargarCursos();
+  };
+
+  const manejarEliminarCurso = (curso: Curso) => {
+    Alert.alert(
+      'Eliminar Curso',
+      `¿Está seguro de que desea eliminar "${curso.nombre}"? Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await CursoService.eliminarCurso(curso.id);
+              setModalOpcionesVisible(false);
+              setCursoSeleccionado(null);
+              cargarCursos();
+              Alert.alert('Eliminado', 'El curso se ha eliminado correctamente.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'No se pudo eliminar el curso.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const irAEvidenciasCurso = (curso: Curso) => {
+    router.push({
+      pathname: '/curso/[id]',
+      params: { id: curso.id, nombre: curso.nombre },
+    });
+  };
+
+  const manejarIrAGenerarReporte = (cursoId: string) => {
+    setModalOpcionesVisible(false);
+    setCursoSeleccionado(null);
+    router.push({
+      pathname: '/(tabs)/two',
+      params: { cursoId },
+    });
   };
 
   const manejarCerrarSesion = () => {
@@ -87,7 +125,7 @@ export default function CursosScreen() {
 
   return (
     <SafeAreaView style={styles.contenedorPadre} edges={['top', 'left', 'right']}>
-      {/* Botones de Acción Superiores (Perfil y Cerrar Sesión) */}
+      {/* ENCABEZADO PRINCIPAL */}
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
@@ -101,15 +139,14 @@ export default function CursosScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Botón Flotante + New Curso y Logo Central */}
       <View style={styles.seccionHeaderLogo}>
         <TouchableOpacity
           style={styles.botonNuevoCurso}
-          onPress={() => setModalVisible(true)}
+          onPress={() => setModalCrearVisible(true)}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="#FFFFFF" />
-          <Text style={styles.textoBotonNuevo}>New Curso</Text>
+          <Text style={styles.textoBotonNuevo}>Nuevo Curso</Text>
         </TouchableOpacity>
 
         <View style={styles.contenedorLogoCursos}>
@@ -121,7 +158,7 @@ export default function CursosScreen() {
         </View>
       </View>
 
-      {/* Buscador de Cursos */}
+      {/* BUSCADOR */}
       <View style={styles.contenedorBuscador}>
         <Ionicons name="search-outline" size={20} color="#7A8B93" style={styles.iconoBuscador} />
         <TextInput
@@ -133,7 +170,7 @@ export default function CursosScreen() {
         />
       </View>
 
-      {/* Lista de Cursos */}
+      {/* LISTADO DE CURSOS */}
       {cargando ? (
         <ActivityIndicator size="large" color="#1E88E5" style={{ marginTop: 40 }} />
       ) : (
@@ -148,87 +185,37 @@ export default function CursosScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.tarjetaCurso} activeOpacity={0.8}>
-              <Text style={styles.nombreCurso}>{item.nombre}</Text>
-              {(item.ciclo || item.semestre || item.codigo) && (
-                <Text style={styles.detallesCurso}>
-                  {item.ciclo ? `${item.ciclo} Ciclo` : ''}{' '}
-                  {item.semestre ? `• ${item.semestre}` : ''}{' '}
-                  {item.codigo ? `• ${item.codigo}` : ''}
-                </Text>
-              )}
-            </TouchableOpacity>
+            <CursoCard
+              curso={item}
+              onPress={() => irAEvidenciasCurso(item)}
+              onOpenOptions={() => {
+                setCursoSeleccionado(item);
+                setModalOpcionesVisible(true);
+              }}
+            />
           )}
         />
       )}
 
-      {/* Modal Crear Curso */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalFondo}>
-          <View style={styles.modalTarjeta}>
-            <Text style={styles.modalTitulo}>Crear Nuevo Curso</Text>
+      {/* MODAL CREAR CURSO */}
+      <ModalCrearCurso
+        visible={modalCrearVisible}
+        onClose={() => setModalCrearVisible(false)}
+        onSubmit={manejarCrearCurso}
+      />
 
-            <Text style={styles.etiqueta}>Nombre de la Asignatura *</Text>
-            <TextInput
-              style={styles.entradaTextoModal}
-              value={nombre}
-              onChangeText={setNombre}
-              placeholder="Ej. Desarrollo de aplicaciones Móviles"
-            />
-
-            <View style={styles.filaCampos}>
-              <View style={{ flex: 1, marginRight: 6 }}>
-                <Text style={styles.etiqueta}>Ciclo *</Text>
-                <TextInput
-                  style={styles.entradaTextoModal}
-                  value={ciclo}
-                  onChangeText={setCiclo}
-                  placeholder="Ej. VIII"
-                />
-              </View>
-
-              <View style={{ flex: 1, marginLeft: 6 }}>
-                <Text style={styles.etiqueta}>Semestre *</Text>
-                <TextInput
-                  style={styles.entradaTextoModal}
-                  value={semestre}
-                  onChangeText={setSemestre}
-                  placeholder="Ej. 2026-I"
-                />
-              </View>
-            </View>
-
-            <Text style={styles.etiqueta}>Código de Curso (Opcional)</Text>
-            <TextInput
-              style={styles.entradaTextoModal}
-              value={codigo}
-              onChangeText={setCodigo}
-              placeholder="Ej. INF-302"
-            />
-
-            <View style={styles.modalBotones}>
-              <TouchableOpacity
-                style={[styles.botonModal, styles.botonCancelar]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.textoBotonCancelar}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.botonModal, styles.botonGuardar]}
-                onPress={manejarCrearCurso}
-                disabled={guardando}
-              >
-                {guardando ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.textoBotonGuardar}>Guardar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* MODAL OPCIONES Y EDICIÓN DE CURSO */}
+      <ModalOpcionesCurso
+        visible={modalOpcionesVisible}
+        curso={cursoSeleccionado}
+        onClose={() => {
+          setModalOpcionesVisible(false);
+          setCursoSeleccionado(null);
+        }}
+        onUpdate={manejarActualizarCurso}
+        onDelete={manejarEliminarCurso}
+        onGenerarReporte={manejarIrAGenerarReporte}
+      />
     </SafeAreaView>
   );
 }
@@ -307,25 +294,6 @@ const styles = StyleSheet.create({
   listaContenedor: {
     paddingBottom: 20,
   },
-  tarjetaCurso: {
-    backgroundColor: '#9DE0FF',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    marginBottom: 14,
-    alignItems: 'center',
-  },
-  nombreCurso: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#002840',
-    textAlign: 'center',
-  },
-  detallesCurso: {
-    fontSize: 12,
-    color: '#1B5270',
-    marginTop: 4,
-  },
   vacioContenedor: {
     alignItems: 'center',
     marginTop: 50,
@@ -333,64 +301,5 @@ const styles = StyleSheet.create({
   textoVacio: {
     color: '#8E9AA0',
     fontSize: 15,
-  },
-  modalFondo: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalTarjeta: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 22,
-  },
-  modalTitulo: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1C252C',
-    marginBottom: 16,
-  },
-  etiqueta: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5B63',
-    marginBottom: 4,
-  },
-  entradaTextoModal: {
-    backgroundColor: '#F2F5F7',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 14,
-    fontSize: 14,
-    color: '#1C252C',
-  },
-  filaCampos: {
-    flexDirection: 'row',
-  },
-  modalBotones: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    gap: 10,
-  },
-  botonModal: {
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  botonCancelar: {
-    backgroundColor: '#E5E9EB',
-  },
-  botonGuardar: {
-    backgroundColor: '#1E88E5',
-  },
-  textoBotonCancelar: {
-    color: '#334148',
-    fontWeight: '600',
-  },
-  textoBotonGuardar: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
 });

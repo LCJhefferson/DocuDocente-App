@@ -38,6 +38,23 @@ export default function ExtracurricularesScreen() {
       Alert.alert('Error', 'No se pudo guardar la actividad.');
     }
   };
+    const manejarEliminar = (actividad: any) => {
+    Alert.alert('Eliminar actividad', `¿Eliminar "${actividad.nombreActividad}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await evidenciaService.eliminarEvidencia(actividad.id);
+            cargarActividades();
+          } catch (error) {
+            Alert.alert('Error', 'No se pudo eliminar la actividad.');
+          }
+        },
+      },
+    ]);
+  };
     const actividadesFiltradas = actividades.filter((a) =>
     a.nombreActividad.toLowerCase().includes(busqueda.toLowerCase())
   );
@@ -70,9 +87,14 @@ export default function ExtracurricularesScreen() {
           <Text style={styles.textoVacio}>No hay actividades extracurriculares registradas.</Text>
         }
         renderItem={({ item }) => (
-          <View style={styles.tarjeta}>
+        <View style={styles.tarjeta}>
+          <View style={styles.info}>
             <Text style={styles.nombre}>{item.nombreActividad}</Text>
-            <Text style={styles.fecha}>{new Date(item.creadoEn).toLocaleDateString('es-ES')}</Text>
+              <Text style={styles.fecha}>{new Date(item.creadoEn).toLocaleDateString('es-ES')}</Text>
+            </View>
+            <TouchableOpacity style={styles.botonEliminar} onPress={() => manejarEliminar(item)}>
+              <Ionicons name="trash-outline" size={20} color="#0F172A" />
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -116,7 +138,16 @@ const styles = StyleSheet.create({
   },
   textoBotonAgregar: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   lista: { paddingHorizontal: 16 },
-  tarjeta: { backgroundColor: '#BAE6FD', borderRadius: 20, padding: 16, marginBottom: 12 },
+    tarjeta: {
+    backgroundColor: '#BAE6FD',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  info: { flex: 1, marginRight: 12 },
+  botonEliminar: { padding: 6, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.4)' },
   nombre: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
   fecha: { fontSize: 12, color: '#475569', marginTop: 4 },
   textoVacio: { color: '#94A3B8', textAlign: 'center', marginTop: 40 },

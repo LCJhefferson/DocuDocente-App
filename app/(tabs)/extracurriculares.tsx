@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
+import { useAuth } from '../../src/context/AuthContext';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
 export default function ExtracurricularesScreen() {
+  const { perfilDocente, cerrarSesion } = useAuth();
   const [actividades, setActividades] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,9 +36,16 @@ export default function ExtracurricularesScreen() {
         tipoArchivo: datos.archivo?.type === 'application/pdf' ? 'PDF' : 'IMAGE',
       });
       cargarActividades();
-    } catch (error) {
+       } catch (error) {
       Alert.alert('Error', 'No se pudo guardar la actividad.');
     }
+  };
+
+  const manejarCerrarSesion = () => {
+    Alert.alert('Cerrar Sesión', '¿Está seguro de que desea salir de la aplicación?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => cerrarSesion() },
+    ]);
   };
     const manejarEliminar = (actividad: any) => {
     Alert.alert('Eliminar actividad', `¿Eliminar "${actividad.nombreActividad}"?`, [
@@ -61,7 +70,21 @@ export default function ExtracurricularesScreen() {
 
   return (
     <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-      <Text style={styles.titulo}>Extracurriculares</Text>
+            <View style={styles.encabezado}>
+        <Text style={styles.titulo}>Extracurriculares</Text>
+        <View style={styles.iconosEncabezado}>
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)
+            }
+          >
+            <Ionicons name="person-outline" size={24} color="#1C252C" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={manejarCerrarSesion}>
+            <Ionicons name="log-out-outline" size={26} color="#1C252C" />
+          </TouchableOpacity>
+        </View>
+      </View>
       
       <View style={styles.contenedorBuscador}>
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
@@ -113,7 +136,15 @@ export default function ExtracurricularesScreen() {
 
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: '#FFFFFF' },
-  titulo: { fontSize: 22, fontWeight: '700', color: '#0F172A', textAlign: 'center', marginVertical: 14 },
+    encabezado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginVertical: 14,
+  },
+  titulo: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
+  iconosEncabezado: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     contenedorBuscador: {
     flexDirection: 'row',
     alignItems: 'center',

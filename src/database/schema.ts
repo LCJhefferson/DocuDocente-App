@@ -34,7 +34,6 @@ export const plantillas = sqliteTable('plantillas', {
   nombreFacultad: text('nombre_facultad'),
   logoUri: text('logo_uri'),
   tituloAnoEncabezado: text('titulo_ano_encabezado').notNull(),
-  formato: text('formato').default('APA 7').notNull(), // <-- NUEVA COLUMNA AÑADIDA
   esPredeterminada: integer('es_predeterminada', { mode: 'boolean' }).default(false).notNull(),
   creadoEn: text('creado_en').notNull(),
 });

@@ -51,6 +51,19 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 4. Plantillas (NUEVA PESTAÑA) */}
+      <Tabs.Screen
+        name="plantillas"
+        options={{
+          title: 'Plantillas',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.contenedorIcono, focused && styles.iconoActivo]}>
+              <Ionicons name="copy-outline" size={20} color={focused ? '#002840' : color} />
+            </View>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

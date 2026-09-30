@@ -1,6 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../database/client';
-import { cursos, informes, resultadosUnidad } from '../database/schema';
+import { resultadosUnidad } from '../database/schema';
 
 export interface GuardarEstadisticaParams {
   cursoId: string;
@@ -13,79 +13,11 @@ export interface GuardarEstadisticaParams {
   informeId?: string;
 }
 
-let tablaActualizada = false;
-
-async function asegurarEstructura() {
-  if (tablaActualizada) return;
-
-  try {
-    await db.run(sql`PRAGMA foreign_keys = OFF;`);
-  } catch (e) {}
-
-  try {
-    await db.run(sql`ALTER TABLE resultados_unidad ADD COLUMN curso_id TEXT;`);
-  } catch (e) {}
-
-  try {
-    await db.run(sql`ALTER TABLE resultados_unidad ADD COLUMN tipo_grafico TEXT DEFAULT 'pastel';`);
-  } catch (e) {}
-
-  tablaActualizada = true;
-}
-
-async function obtenerOCrearInformeId(cursoId: string, totalAlumnos: number): Promise<string> {
-  try {
-    const informesExistentes = await db
-      .select()
-      .from(informes)
-      .where(eq(informes.cursoId, cursoId));
-
-    if (informesExistentes.length > 0) {
-      return informesExistentes[0].id;
-    }
-
-    const cursoData = await db
-      .select()
-      .from(cursos)
-      .where(eq(cursos.id, cursoId));
-
-    const infoCurso = cursoData[0];
-    const nuevoInformeId = `inf_${Date.now()}`;
-    const ahoraStr = new Date().toISOString();
-
-    await db.insert(informes).values({
-      id: nuevoInformeId,
-      perfilDocenteId: infoCurso?.perfilDocenteId || null,
-      cursoId: cursoId,
-      numeroInforme: 'INF-001',
-      dirigidoANombre: 'Director de Departamento Académico',
-      dirigidoACargo: 'Director de Escuela',
-      remitenteNombre: 'Docente Titular',
-      asunto: `Informe Académico - ${infoCurso?.nombre || 'Curso'}`,
-      fechaStr: new Date().toLocaleDateString('es-PE'),
-      nombreCurso: infoCurso?.nombre || 'Curso',
-      ciclo: infoCurso?.ciclo || 'I',
-      semestre: infoCurso?.semestre || '2026-I',
-      totalEstudiantes: totalAlumnos,
-      estado: 'BORRADOR',
-      creadoEn: ahoraStr,
-      actualizadoEn: ahoraStr,
-    });
-
-    return nuevoInformeId;
-  } catch (err) {
-    console.warn('No se pudo crear borrador de informe, usando identificador directo:', err);
-    return `inf_auto_${cursoId}`;
-  }
-}
-
 export const estadisticasService = {
   async guardar(params: GuardarEstadisticaParams) {
     try {
-      await asegurarEstructura();
-
-      const total = params.aprobados + params.desaprobados;
-      const informeIdValido = params.informeId || (await obtenerOCrearInformeId(params.cursoId, total));
+      // Las notas son del curso: se vinculan a un informe solo si se indica
+      const informeIdValido = params.informeId ?? null;
 
       const existentes = await db
         .select()
@@ -132,8 +64,6 @@ export const estadisticasService = {
 
   async obtenerPorCursoYUnidad(cursoId: string, unidad: string) {
     try {
-      await asegurarEstructura();
-
       const res = await db
         .select()
         .from(resultadosUnidad)
@@ -152,8 +82,6 @@ export const estadisticasService = {
 
   async eliminar(cursoId: string, unidad: string) {
     try {
-      await asegurarEstructura();
-
       await db
         .delete(resultadosUnidad)
         .where(

@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EntradaCrearInforme, EntradaResultadoUnidad, Informe } from '../models/Informe';
+import { EntradaCrearInforme, EntradaResultadoUnidad, Informe, InformeCompleto } from '../models/Informe';
 import { InformeService } from '../services/informeService';
-import { compartirPdf, generarPdfInforme } from '../services/pdfService';
+import { compartirPdf, descargarPdfInforme, generarPdfInforme } from '../services/pdfService';
 
 /**
  * Lógica del módulo de informes para las pantallas:
@@ -49,18 +49,24 @@ export const useInformes = () => {
     await cargarInformes();
   };
 
-  // Genera el PDF y abre el menú para compartirlo
-  const exportarPdf = async (informeId: string) => {
+  // Busca el informe completo y ejecuta una acción con él (mostrando "cargando")
+  const conInforme = async (informeId: string, accion: (datos: InformeCompleto) => Promise<void>) => {
     setGenerandoPdf(true);
     try {
       const datos = await InformeService.obtenerInformeCompleto(informeId);
       if (!datos) throw new Error('No se encontró el informe.');
-      const uri = await generarPdfInforme(datos);
-      await compartirPdf(uri);
+      await accion(datos);
     } finally {
       setGenerandoPdf(false);
     }
   };
+
+  // Genera el PDF y abre el menú para compartirlo (WhatsApp, Drive, correo...)
+  const compartirInforme = (informeId: string) =>
+    conInforme(informeId, async (datos) => compartirPdf(await generarPdfInforme(datos)));
+
+  // Abre "Guardar como PDF" del sistema para descargarlo
+  const descargarInforme = (informeId: string) => conInforme(informeId, descargarPdfInforme);
 
   return {
     informes,
@@ -69,6 +75,7 @@ export const useInformes = () => {
     cargarInformes,
     crearInforme,
     eliminarInforme,
-    exportarPdf,
+    compartirInforme,
+    descargarInforme,
   };
 };

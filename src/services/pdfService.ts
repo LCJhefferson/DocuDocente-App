@@ -133,6 +133,15 @@ export const generarPdfInforme = async (datos: InformeCompleto): Promise<string>
 };
 
 /**
+ * Abre la vista de impresión del sistema: en Android trae "Guardar como PDF"
+ * para descargarlo en la carpeta que elija el docente
+ */
+export const descargarPdfInforme = async (datos: InformeCompleto): Promise<void> => {
+  const html = await construirHtmlInforme(datos);
+  await Print.printAsync({ html });
+};
+
+/**
  * Abre el menú de compartir (WhatsApp, Drive, correo...) con el PDF
  */
 export const compartirPdf = async (uri: string): Promise<void> => {

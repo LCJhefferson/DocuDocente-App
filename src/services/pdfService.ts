@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { EvidenciaInforme, InformeCompleto, UNIDADES_INFORME } from '../models/Informe';
@@ -128,8 +128,13 @@ export const construirHtmlInforme = async ({ informe, unidades, evidencias }: In
  */
 export const generarPdfInforme = async (datos: InformeCompleto): Promise<string> => {
   const html = await construirHtmlInforme(datos);
-  const { uri } = await Print.printToFileAsync({ html });
-  return uri;
+  // En Expo Go, compartir no puede leer la carpeta donde expo-print deja el PDF
+  // ("Not allowed to read file"): se reescribe en la caché de la app
+  const { base64 } = await Print.printToFileAsync({ html, base64: true });
+  const nombre = `Informe-${datos.informe.numeroInforme.replace(/[^\w-]+/g, '_')}.pdf`;
+  const pdf = new File(Paths.cache, nombre);
+  pdf.write(base64!, { encoding: 'base64' });
+  return pdf.uri;
 };
 
 /**

@@ -34,6 +34,7 @@ export const plantillas = sqliteTable('plantillas', {
   nombreFacultad: text('nombre_facultad'),
   logoUri: text('logo_uri'),
   tituloAnoEncabezado: text('titulo_ano_encabezado').notNull(),
+  formato: text('formato').default('APA 7').notNull(), // <-- NUEVA COLUMNA AÑADIDA
   esPredeterminada: integer('es_predeterminada', { mode: 'boolean' }).default(false).notNull(),
   creadoEn: text('creado_en').notNull(),
 });
@@ -74,7 +75,6 @@ export const informes = sqliteTable('informes', {
 });
 
 // 6. RESULTADOS ESTADÍSTICOS POR UNIDAD
-// 6. RESULTADOS ESTADÍSTICOS POR UNIDAD
 export const resultadosUnidad = sqliteTable('resultados_unidad', {
   id: text('id').primaryKey(),
   cursoId: text('curso_id').references(() => cursos.id, { onDelete: 'cascade' }),
@@ -87,6 +87,7 @@ export const resultadosUnidad = sqliteTable('resultados_unidad', {
   tipoGrafico: text('tipo_grafico').default('pastel'),
   textoInterpretacion: text('texto_interpretacion'),
 });
+
 // 7. ACTIVIDADES EVALUATIVAS
 export const actividades = sqliteTable('actividades', {
   id: text('id').primaryKey(),
@@ -96,30 +97,22 @@ export const actividades = sqliteTable('actividades', {
   categoria: text('categoria', { enum: ['CONOCIMIENTO', 'DESEMPENO', 'PRODUCTO'] }).notNull(),
 });
 
-// 8. EVIDENCIAS (Actualizada con clasificación Académica vs Extracurricular)
+// 8. EVIDENCIAS
 export const evidencias = sqliteTable('evidencias', {
   id: text('id').primaryKey(),
-  // Clasificación general de la evidencia
   tipoGeneral: text('tipo_general', { enum: ['ACADEMICA', 'EXTRACURRICULAR'] })
     .default('ACADEMICA')
     .notNull(),
-  
-  // Relaciones
   cursoId: text('curso_id').references(() => cursos.id, { onDelete: 'cascade' }),
   actividadId: text('actividad_id').references(() => actividades.id, { onDelete: 'cascade' }),
-  
-  // Detalles del formulario de evidencia
   nombreActividad: text('nombre_actividad').notNull(),
   descripcion: text('descripcion'),
-  unidad: text('unidad'), // Ej: 'Unidad 1', 'Unidad 2', 'Unidad 3'
-  tipoActividad: text('tipo_actividad'), // Ej: 'Sesión de clase', 'Evaluación', 'Otro'
-  
-  // Archivo adjunto
+  unidad: text('unidad'), 
+  tipoActividad: text('tipo_actividad'),
   rutaArchivoLocal: text('ruta_archivo_local'),
   urlRemota: text('url_remota'),
-  tipoArchivo: text('tipo_archivo').default('IMAGE'), // 'IMAGE', 'PDF', 'DOCUMENT'
+  tipoArchivo: text('tipo_archivo').default('IMAGE'),
   leyenda: text('leyenda'),
-  
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
 });

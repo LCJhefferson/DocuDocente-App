@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
@@ -177,10 +177,23 @@ export default function EvidenciasCursoScreen() {
         />
       </View>
 
-      {/* BOTÓN AÑADIR EVIDENCIA */}
-      <View style={styles.contenedorBotonAgregar}>
+      {/* BOTONES DE ACCIÓN: AÑADIR NOTAS Y AÑADIR EVIDENCIA */}
+      <View style={styles.contenedorBotonesAccion}>
+        <TouchableOpacity
+          style={styles.botonNotas}
+          onPress={() =>
+            router.push({
+              pathname: '/curso/notas-estadisticas' as any,
+              params: { id, nombre: nombre || 'Curso', unidad: unidadSeleccionada },
+            })
+          }
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#0F172A" />
+          <Text style={styles.textoBotonNotas}>Añadir Notas</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.botonAgregar} onPress={() => setModalVisible(true)}>
-          <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
+          <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
           <Text style={styles.textoBotonAgregar}>Añadir evidencia</Text>
         </TouchableOpacity>
       </View>
@@ -315,16 +328,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
   },
-  contenedorBotonAgregar: {
-    alignItems: 'flex-end',
+  contenedorBotonesAccion: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     marginBottom: 16,
+    gap: 10,
   },
-  botonAgregar: {
+  botonNotas: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4ADE80',
+    paddingVertical: 10,
+    borderRadius: 14,
+    gap: 6,
+  },
+  textoBotonNotas: {
+    color: '#0F172A',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  botonAgregar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 14,
     gap: 6,
@@ -332,7 +363,7 @@ const styles = StyleSheet.create({
   textoBotonAgregar: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   listaContenido: {
     paddingHorizontal: 16,

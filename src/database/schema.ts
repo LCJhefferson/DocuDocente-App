@@ -74,17 +74,19 @@ export const informes = sqliteTable('informes', {
 });
 
 // 6. RESULTADOS ESTADÍSTICOS POR UNIDAD
+// 6. RESULTADOS ESTADÍSTICOS POR UNIDAD
 export const resultadosUnidad = sqliteTable('resultados_unidad', {
   id: text('id').primaryKey(),
-  informeId: text('informe_id').references(() => informes.id, { onDelete: 'cascade' }).notNull(),
+  cursoId: text('curso_id').references(() => cursos.id, { onDelete: 'cascade' }),
+  informeId: text('informe_id').references(() => informes.id, { onDelete: 'cascade' }),
   nombreUnidad: text('nombre_unidad').notNull(),
   cantidadAprobados: integer('cantidad_aprobados').notNull(),
   cantidadDesaprobados: integer('cantidad_desaprobados').notNull(),
   porcentajeAprobados: real('porcentaje_aprobados').notNull(),
   porcentajeDesaprobados: real('porcentaje_desaprobados').notNull(),
+  tipoGrafico: text('tipo_grafico').default('pastel'),
   textoInterpretacion: text('texto_interpretacion'),
 });
-
 // 7. ACTIVIDADES EVALUATIVAS
 export const actividades = sqliteTable('actividades', {
   id: text('id').primaryKey(),

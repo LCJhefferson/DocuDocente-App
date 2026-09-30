@@ -33,6 +33,48 @@ export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
 };
 
 /**
+ * BD creadas con la versión anterior: resultados_unidad tenía informe_id NOT NULL
+ * y sin curso_id / tipo_grafico. SQLite no permite quitar un NOT NULL con ALTER,
+ * así que se reconstruye la tabla conservando los datos.
+ * También limpia los informes BORRADOR automáticos que creaba el módulo de notas.
+ */
+const migrarResultadosUnidad = () => {
+  const columnas = expoDb.getAllSync<{ name: string; notnull: number }>('PRAGMA table_info(resultados_unidad);');
+  const informeId = columnas.find((c) => c.name === 'informe_id');
+  if (!informeId || informeId.notnull === 0) return; // ya está actualizada
+
+  const tiene = (nombre: string) => columnas.some((c) => c.name === nombre);
+
+  expoDb.execSync(`
+    ALTER TABLE resultados_unidad RENAME TO resultados_unidad_old;
+    CREATE TABLE resultados_unidad (
+      id TEXT PRIMARY KEY NOT NULL,
+      curso_id TEXT REFERENCES cursos(id) ON DELETE CASCADE,
+      informe_id TEXT REFERENCES informes(id) ON DELETE CASCADE,
+      nombre_unidad TEXT NOT NULL,
+      cantidad_aprobados INTEGER NOT NULL,
+      cantidad_desaprobados INTEGER NOT NULL,
+      porcentaje_aprobados REAL NOT NULL,
+      porcentaje_desaprobados REAL NOT NULL,
+      tipo_grafico TEXT DEFAULT 'pastel',
+      texto_interpretacion TEXT
+    );
+    INSERT INTO resultados_unidad
+    SELECT id,
+      ${tiene('curso_id') ? 'CASE WHEN curso_id IN (SELECT id FROM cursos) THEN curso_id END' : 'NULL'},
+      CASE WHEN informe_id IN (SELECT id FROM informes WHERE estado <> 'BORRADOR') THEN informe_id END,
+      nombre_unidad, cantidad_aprobados, cantidad_desaprobados,
+      porcentaje_aprobados, porcentaje_desaprobados,
+      ${tiene('tipo_grafico') ? 'tipo_grafico' : "'pastel'"},
+      texto_interpretacion
+    FROM resultados_unidad_old;
+    DROP TABLE resultados_unidad_old;
+    DELETE FROM informes WHERE estado = 'BORRADOR';
+  `);
+  console.log('[DB] resultados_unidad migrada.');
+};
+
+/**
  * Inicialización de las tablas de SQLite y siembra de datos base
  */
 export const initDatabase = async (): Promise<void> => {
@@ -103,12 +145,14 @@ export const initDatabase = async (): Promise<void> => {
 
       CREATE TABLE IF NOT EXISTS resultados_unidad (
         id TEXT PRIMARY KEY NOT NULL,
-        informe_id TEXT NOT NULL REFERENCES informes(id) ON DELETE CASCADE,
+        curso_id TEXT REFERENCES cursos(id) ON DELETE CASCADE,
+        informe_id TEXT REFERENCES informes(id) ON DELETE CASCADE,
         nombre_unidad TEXT NOT NULL,
         cantidad_aprobados INTEGER NOT NULL,
         cantidad_desaprobados INTEGER NOT NULL,
         porcentaje_aprobados REAL NOT NULL,
         porcentaje_desaprobados REAL NOT NULL,
+        tipo_grafico TEXT DEFAULT 'pastel',
         texto_interpretacion TEXT
       );
 
@@ -137,6 +181,8 @@ export const initDatabase = async (): Promise<void> => {
         actualizado_en TEXT NOT NULL
       );
     `);
+
+    migrarResultadosUnidad();
 
     // AUTO-SIEMBRA: Garantiza que la cuenta y perfil por defecto existan en SQLite
     const perfiles = expoDb.getAllSync('SELECT id FROM perfiles_docente LIMIT 1;');

@@ -3,15 +3,15 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,8 +24,11 @@ interface ArchivoAdjunto {
 interface ModalSubirEvidenciaProps {
   visible: boolean;
   onClose: () => void;
-  nombreCurso: string;
-  unidadActual: string;
+  nombreCurso?: string;
+  unidadActual?: string;
+  titulo?: string;
+  subtitulo?: string;
+  tipos?: string[];
   onGuardar: (evidencia: {
     nombreActividad: string;
     descripcion: string;
@@ -41,11 +44,14 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
   onClose,
   nombreCurso,
   unidadActual,
+  titulo = 'Subir evidencia',
+  subtitulo,
+  tipos = TIPOS_ACTIVIDAD,
   onGuardar,
 }) => {
   const [nombreActividad, setNombreActividad] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [tipoSeleccionado, setTipoSeleccionado] = useState('Sesión de clase');
+  const [tipoSeleccionado, setTipoSeleccionado] = useState(tipos[0]);
   const [archivo, setArchivo] = useState<ArchivoAdjunto | null>(null);
 
   // Tomar Foto con Cámara
@@ -131,7 +137,7 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
     // Limpieza de campos al cerrar
     setNombreActividad('');
     setDescripcion('');
-    setTipoSeleccionado('Sesión de clase');
+   setTipoSeleccionado(tipos[0]);
     setArchivo(null);
     onClose();
   };
@@ -149,11 +155,12 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
           contentContainerStyle={styles.scrollContent}
         >
           {/* CABECERA */}
-          <Text style={styles.tituloModal}>Subir evidencia</Text>
-          <Text style={styles.subtituloModal}>
-            Curso: {nombreCurso} · {unidadActual}
-          </Text>
-
+           <Text style={styles.tituloModal}>{titulo}</Text>
+          {(subtitulo || nombreCurso) && (
+            <Text style={styles.subtituloModal}>
+              {subtitulo ?? `Curso: ${nombreCurso} · ${unidadActual}`}
+            </Text>
+          )}
           {/* ILUSTRACIÓN DE LA MASCOTA */}
           <View style={styles.contenedorMascota}>
             <Image
@@ -194,7 +201,7 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
           <View style={styles.grupoCampo}>
             <Text style={styles.label}>Tipo de actividad</Text>
             <View style={styles.contenedorPills}>
-              {TIPOS_ACTIVIDAD.map((tipo) => {
+              {tipos.map((tipo) => {
                 const activo = tipoSeleccionado === tipo;
                 return (
                   <TouchableOpacity

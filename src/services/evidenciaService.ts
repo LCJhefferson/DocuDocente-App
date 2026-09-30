@@ -1,7 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../database/client';
 import { evidencias } from '../database/schema';
 import { CrearEvidenciaDTO } from '../models/Evidence';
+
 
 export const evidenciaService = {
   /**
@@ -28,6 +29,18 @@ export const evidenciaService = {
   /**
    * Inserta una nueva evidencia en SQLite
    */
+  async obtenerExtracurriculares() {
+    try {
+      return await db
+        .select()
+        .from(evidencias)
+        .where(eq(evidencias.tipoGeneral, 'EXTRACURRICULAR'))
+        .orderBy(desc(evidencias.creadoEn));
+    } catch (error) {
+      console.error('[evidenciaService.obtenerExtracurriculares Error]:', error);
+      throw error;
+    }
+  },
   async crearEvidencia(dto: CrearEvidenciaDTO) {
     try {
       const nuevaEvidencia = {

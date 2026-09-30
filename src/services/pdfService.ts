@@ -13,15 +13,18 @@ const escapar = (texto: string | null | undefined) =>
     .replace(/"/g, '&quot;');
 
 // expo-print no puede leer fotos del celular por su ruta: hay que incrustarlas en base64
-const fotoEnBase64 = async (evidencia: EvidenciaInforme): Promise<string | null> => {
-  if (!evidencia.rutaArchivoLocal || evidencia.tipoArchivo !== 'IMAGE') return null;
+const imagenEnBase64 = async (uri: string | null): Promise<string | null> => {
+  if (!uri) return null;
   try {
-    const base64 = await new File(evidencia.rutaArchivoLocal).base64();
-    return `data:image/jpeg;base64,${base64}`;
+    const base64 = await new File(uri).base64();
+    return `data:image/${uri.toLowerCase().endsWith('.png') ? 'png' : 'jpeg'};base64,${base64}`;
   } catch {
-    return null; // la foto se borró del celular -> se omite sin romper el informe
+    return null; // la imagen se borró del celular -> se omite sin romper el informe
   }
 };
+
+const fotoEnBase64 = (evidencia: EvidenciaInforme) =>
+  evidencia.tipoArchivo === 'IMAGE' ? imagenEnBase64(evidencia.rutaArchivoLocal) : Promise.resolve(null);
 
 const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
   <h3>Resultados de la ${escapar(u.nombreUnidad)}</h3>
@@ -36,7 +39,8 @@ const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
 /**
  * Construye el HTML del informe con el formato de oficio de la UNTRM
  */
-export const construirHtmlInforme = async ({ informe, unidades, evidencias }: InformeCompleto): Promise<string> => {
+export const construirHtmlInforme = async ({ informe, unidades, evidencias, plantilla }: InformeCompleto): Promise<string> => {
+  const logo = await imagenEnBase64(plantilla.logoUri);
   const hayPlanMejora = unidades.some((u) => u.porcentajeDesaprobados >= LIMITE_PLAN_MEJORA);
 
   // Evidencias agrupadas por unidad, cada una con su foto (si tiene)
@@ -65,6 +69,10 @@ export const construirHtmlInforme = async ({ informe, unidades, evidencias }: In
   @page { margin: 22mm 20mm; }
   body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; }
   .centro { text-align: center; }
+  .encabezado { text-align: center; margin-bottom: 8px; }
+  .encabezado img { max-height: 70px; margin-bottom: 4px; }
+  .institucion { font-weight: bold; font-size: 12pt; }
+  .facultad { font-size: 11pt; }
   .ano { font-style: italic; text-align: center; margin-bottom: 18px; }
   h1 { font-size: 13pt; text-decoration: underline; margin: 12px 0; }
   h2 { font-size: 12pt; margin: 18px 0 6px; }
@@ -82,7 +90,12 @@ export const construirHtmlInforme = async ({ informe, unidades, evidencias }: In
 </style>
 </head>
 <body>
-  <p class="ano">"Año de la Esperanza y el Fortalecimiento de la Democracia"</p>
+  <div class="encabezado">
+    ${logo ? `<img src="${logo}" /><br/>` : ''}
+    <div class="institucion">${escapar(plantilla.nombreInstitucion)}</div>
+    ${plantilla.nombreFacultad ? `<div class="facultad">${escapar(plantilla.nombreFacultad)}</div>` : ''}
+  </div>
+  <p class="ano">"${escapar(plantilla.tituloAnoEncabezado)}"</p>
 
   <h1>INFORME N° ${escapar(informe.numeroInforme)}</h1>
 

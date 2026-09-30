@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { EntradaResultadoUnidad, UNIDADES_INFORME } from '../../models/Informe';
+import { InformeService } from '../../services/informeService';
 import { calcularResumenUnidad } from '../../utils/estadisticas';
 
 interface CursoInforme {
@@ -47,9 +48,6 @@ const fechaDeHoy = () => {
   return `Bagua, ${hoy.getDate()} de ${MESES[hoy.getMonth()]} de ${hoy.getFullYear()}`;
 };
 
-// Solo dígitos: evita letras o signos en las cantidades
-const soloNumeros = (texto: string) => texto.replace(/[^0-9]/g, '');
-
 export const FormularioInforme = ({ curso, onGuardar, onCancelar }: Props) => {
   const [numeroInforme, setNumeroInforme] = useState(`001-${new Date().getFullYear()}-UNTRM-FISME`);
   const [dirigidoANombre, setDirigidoANombre] = useState('');
@@ -58,29 +56,40 @@ export const FormularioInforme = ({ curso, onGuardar, onCancelar }: Props) => {
   const [fechaStr, setFechaStr] = useState(fechaDeHoy());
   const [guardando, setGuardando] = useState(false);
 
-  // Cantidades por unidad como texto (así el campo puede quedar vacío)
-  const [cantidades, setCantidades] = useState<Record<string, { aprobados: string; desaprobados: string }>>(
-    Object.fromEntries(UNIDADES_INFORME.map((u) => [u, { aprobados: '', desaprobados: '' }]))
-  );
+  // Notas que el docente ya guardó en "Añadir notas", por unidad
+  const [notas, setNotas] = useState<EntradaResultadoUnidad[] | null>(null);
 
-  const cambiarCantidad = (unidad: string, campo: 'aprobados' | 'desaprobados', valor: string) => {
-    setCantidades((actual) => ({ ...actual, [unidad]: { ...actual[unidad], [campo]: soloNumeros(valor) } }));
-  };
+  useEffect(() => {
+    InformeService.obtenerNotasDelCurso(curso.id)
+      .then((filas) =>
+        setNotas(
+          filas.map((f) => ({
+            nombreUnidad: f.nombreUnidad,
+            cantidadAprobados: f.cantidadAprobados,
+            cantidadDesaprobados: f.cantidadDesaprobados,
+          }))
+        )
+      )
+      .catch((error) => {
+        console.error('[FormularioInforme] Error al leer notas:', error);
+        setNotas([]);
+      });
+  }, [curso.id]);
+
+  const notasDe = (unidad: string) => notas?.find((n) => n.nombreUnidad === unidad);
 
   const guardar = async () => {
-    // Solo se incluyen las unidades que tienen al menos un estudiante
-    const unidades: EntradaResultadoUnidad[] = UNIDADES_INFORME.map((u) => ({
-      nombreUnidad: u,
-      cantidadAprobados: Number(cantidades[u].aprobados || 0),
-      cantidadDesaprobados: Number(cantidades[u].desaprobados || 0),
-    })).filter((u) => u.cantidadAprobados + u.cantidadDesaprobados > 0);
+    // Solo entran las unidades que tienen notas guardadas
+    const unidades = UNIDADES_INFORME.map(notasDe).filter(
+      (u): u is EntradaResultadoUnidad => !!u && u.cantidadAprobados + u.cantidadDesaprobados > 0
+    );
 
     if (!numeroInforme.trim() || !dirigidoANombre.trim() || !dirigidoACargo.trim() || !asunto.trim()) {
       Alert.alert('Faltan datos', 'Completa el N° de informe, a quién va dirigido, su cargo y el asunto.');
       return;
     }
     if (unidades.length === 0) {
-      Alert.alert('Faltan resultados', 'Ingresa aprobados y desaprobados de al menos una unidad.');
+      Alert.alert('Sin notas', 'Este curso aún no tiene notas. Súbelas desde el curso con «Añadir notas».');
       return;
     }
 
@@ -123,26 +132,24 @@ export const FormularioInforme = ({ curso, onGuardar, onCancelar }: Props) => {
 
       {/* RESULTADOS POR UNIDAD */}
       <Text style={styles.seccion}>Resultados por unidad</Text>
-      <Text style={styles.ayuda}>Deja en blanco las unidades que aún no evalúas.</Text>
+      <Text style={styles.ayuda}>Se toman de «Añadir notas» de cada unidad del curso.</Text>
 
-      {UNIDADES_INFORME.map((unidad) => {
-        const aprobados = Number(cantidades[unidad].aprobados || 0);
-        const desaprobados = Number(cantidades[unidad].desaprobados || 0);
-        const resumen = calcularResumenUnidad(aprobados, desaprobados);
+      {notas === null && <ActivityIndicator color="#38BDF8" style={{ marginVertical: 12 }} />}
+
+      {notas !== null && UNIDADES_INFORME.map((unidad) => {
+        const nota = notasDe(unidad);
+        const resumen = calcularResumenUnidad(nota?.cantidadAprobados ?? 0, nota?.cantidadDesaprobados ?? 0);
 
         return (
           <View key={unidad} style={styles.tarjetaUnidad}>
             <Text style={styles.nombreUnidad}>{unidad}</Text>
-            <View style={styles.fila}>
-              <CampoNumero etiqueta="Aprobados" valor={cantidades[unidad].aprobados} onCambiar={(v) => cambiarCantidad(unidad, 'aprobados', v)} />
-              <CampoNumero etiqueta="Desaprobados" valor={cantidades[unidad].desaprobados} onCambiar={(v) => cambiarCantidad(unidad, 'desaprobados', v)} />
-            </View>
-
-            {/* Vista previa de los porcentajes mientras escribe */}
-            {resumen.total > 0 && (
+            {resumen.total > 0 ? (
               <Text style={styles.porcentajes}>
-                {resumen.total} estudiantes · {resumen.porcentajeAprobados} % aprobados · {resumen.porcentajeDesaprobados} % desaprobados
+                {resumen.total} estudiantes · {nota!.cantidadAprobados} aprobados ({resumen.porcentajeAprobados} %) ·{' '}
+                {nota!.cantidadDesaprobados} desaprobados ({resumen.porcentajeDesaprobados} %)
               </Text>
+            ) : (
+              <Text style={styles.sinNotas}>Sin notas: súbelas en «Añadir notas» de esta unidad.</Text>
             )}
             {resumen.requierePlanMejora && (
               <View style={styles.alerta}>
@@ -155,7 +162,7 @@ export const FormularioInforme = ({ curso, onGuardar, onCancelar }: Props) => {
       })}
 
       {/* ACCIONES */}
-      <TouchableOpacity style={[styles.botonPrincipal, guardando && styles.botonDeshabilitado]} onPress={guardar} disabled={guardando}>
+      <TouchableOpacity style={[styles.botonPrincipal, (guardando || notas === null) && styles.botonDeshabilitado]} onPress={guardar} disabled={guardando || notas === null}>
         {guardando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.textoBotonPrincipal}>Generar informe</Text>}
       </TouchableOpacity>
       <TouchableOpacity style={styles.botonSecundario} onPress={onCancelar} disabled={guardando}>
@@ -171,13 +178,6 @@ const Campo = ({ etiqueta, valor, onCambiar, ejemplo }: { etiqueta: string; valo
   <View style={styles.campo}>
     <Text style={styles.etiqueta}>{etiqueta}</Text>
     <TextInput style={styles.input} value={valor} onChangeText={onCambiar} placeholder={ejemplo} placeholderTextColor="#94A3B8" />
-  </View>
-);
-
-const CampoNumero = ({ etiqueta, valor, onCambiar }: { etiqueta: string; valor: string; onCambiar: (v: string) => void }) => (
-  <View style={styles.campoNumero}>
-    <Text style={styles.etiqueta}>{etiqueta}</Text>
-    <TextInput style={styles.input} value={valor} onChangeText={onCambiar} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" maxLength={3} />
   </View>
 );
 
@@ -201,9 +201,8 @@ const styles = StyleSheet.create({
   },
   tarjetaUnidad: { backgroundColor: '#F1F5F9', borderRadius: 16, padding: 12, marginBottom: 12 },
   nombreUnidad: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  fila: { flexDirection: 'row', gap: 12 },
-  campoNumero: { flex: 1 },
-  porcentajes: { fontSize: 12, color: '#0F172A', marginTop: 8 },
+  porcentajes: { fontSize: 13, color: '#0F172A' },
+  sinNotas: { fontSize: 12, color: '#94A3B8' },
   alerta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: '#FEF3C7', borderRadius: 10, padding: 8 },
   textoAlerta: { flex: 1, fontSize: 12, color: '#B45309' },
   botonPrincipal: { backgroundColor: '#38BDF8', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 20 },

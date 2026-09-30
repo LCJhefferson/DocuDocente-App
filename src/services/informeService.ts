@@ -1,13 +1,14 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/client';
-import { cursos, evidencias, informes, resultadosUnidad } from '../database/schema';
+import { cursos, evidencias, informes, plantillas, resultadosUnidad } from '../database/schema';
 import {
   EntradaCrearInforme,
   EntradaResultadoUnidad,
   Informe,
   InformeCompleto,
+  PLANTILLA_UNTRM,
 } from '../models/Informe';
 import { calcularResumenUnidad, generarInterpretacion } from '../utils/estadisticas';
 
@@ -101,7 +102,20 @@ export class InformeService {
           .orderBy(evidencias.unidad, evidencias.creadoEn)
       : [];
 
-    return { informe, unidades, evidencias: evidenciasCurso };
+    // Plantilla predeterminada del módulo de plantillas; si no hay, la de la UNTRM
+    const [plantilla] = await db.select().from(plantillas).where(eq(plantillas.esPredeterminada, true)).limit(1);
+
+    return { informe, unidades, evidencias: evidenciasCurso, plantilla: plantilla ?? PLANTILLA_UNTRM };
+  }
+
+  /**
+   * Notas guardadas en "Añadir notas" para el curso (aún no copiadas a un informe)
+   */
+  static async obtenerNotasDelCurso(cursoId: string) {
+    return db
+      .select()
+      .from(resultadosUnidad)
+      .where(and(eq(resultadosUnidad.cursoId, cursoId), isNull(resultadosUnidad.informeId)));
   }
 
   /**

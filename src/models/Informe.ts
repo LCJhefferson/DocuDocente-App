@@ -52,9 +52,26 @@ export interface EvidenciaInforme {
   tipoArchivo: string | null;
 }
 
+// Encabezado del informe (tabla plantillas, se configura en el módulo de plantillas)
+export interface PlantillaInforme {
+  nombreInstitucion: string;
+  nombreFacultad: string | null;
+  logoUri: string | null;
+  tituloAnoEncabezado: string;
+}
+
+// Se usa mientras el docente no haya configurado una plantilla predeterminada
+export const PLANTILLA_UNTRM: PlantillaInforme = {
+  nombreInstitucion: 'UNIVERSIDAD NACIONAL TORIBIO RODRÍGUEZ DE MENDOZA DE AMAZONAS',
+  nombreFacultad: 'Facultad de Ingeniería de Sistemas y Mecánica Eléctrica',
+  logoUri: null,
+  tituloAnoEncabezado: 'Año de la Esperanza y el Fortalecimiento de la Democracia',
+};
+
 // Todo lo necesario para mostrar el informe en la app o exportarlo
 export interface InformeCompleto {
   informe: Informe;
   unidades: ResultadoUnidad[];
   evidencias: EvidenciaInforme[];
+  plantilla: PlantillaInforme;
 }

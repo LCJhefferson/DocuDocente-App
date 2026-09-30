@@ -64,7 +64,7 @@ export default function VistaPreviaInformeScreen() {
     );
   }
 
-  const { informe, unidades, evidencias } = datos;
+  const { informe, unidades, evidencias, plantilla } = datos;
   const nombresUnidades = unidades.map((u) => u.nombreUnidad).join(', ');
   const fotos = evidencias.filter((e) => e.tipoArchivo === 'IMAGE' && e.rutaArchivoLocal);
 
@@ -101,7 +101,7 @@ export default function VistaPreviaInformeScreen() {
 
         {/* HOJA DEL INFORME */}
         <View style={styles.hoja}>
-          <Text style={styles.universidad}>UNIVERSIDAD NACIONAL TORIBIO{'\n'}RODRÍGUEZ DE MENDOZA</Text>
+          <Text style={styles.universidad}>{plantilla.nombreInstitucion}</Text>
           <Text style={styles.tituloHoja}>INFORME N° {informe.numeroInforme}</Text>
           <View style={styles.divisor} />
 

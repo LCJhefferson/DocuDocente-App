@@ -4,9 +4,9 @@ import { Cabecera, ContenidoInforme, DefinicionPlantilla, Pie, Seccion } from '.
 import { generarInterpretacion, LIMITE_PLAN_MEJORA } from '../utils/estadisticas';
 import { escapar, imagenEnBase64 } from '../utils/htmlPdf';
 import { reemplazarMarcadores, unidadEnRomano } from '../utils/informeTexto';
+import { marcaSeccion } from '../data/catalogoPlantillas';
 import { DatosCurso, DatosInforme } from './informeDatosService';
 
-const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
 
 const DOCUMENTACION_POR_DEFECTO = [
@@ -46,6 +46,7 @@ const htmlPie = (p: Pie) =>
   p.lineas.length ? `<div class="pie"><div class="linea-doble"></div>${p.lineas.map((l) => `<div>${escapar(l)}</div>`).join('')}</div>` : '';
 
 const htmlCampos = (definicion: DefinicionPlantilla, contenido: ContenidoInforme) => {
+  if (!definicion.campos.length) return '';
   const valor = (clave: string, porDefecto: string) => contenido.campos[clave] ?? porDefecto;
   const numero = definicion.campos.find((c) => c.clave === 'numero');
   const filas = definicion.campos
@@ -221,7 +222,7 @@ export const construirHtmlDesdePlantilla = async (
   let numero = 0;
   let cuerpo = '';
   for (const s of expandirSecciones(definicion.secciones, datos.unidades)) {
-    const marca = definicion.numeracion === 'romanos' ? `${ROMANOS[numero]}.` : `${String.fromCharCode(65 + numero)})`;
+    const marca = marcaSeccion(definicion.numeracion, numero);
     const titulo = s.titulo ? `<h2>${marca} ${escapar(reemplazarMarcadores(s.titulo, datos.valores))}</h2>` : '';
     if (s.titulo) numero += 1;
     cuerpo += `<section>${titulo}${await dibujarSeccion(s, datos, contenido)}</section>`;

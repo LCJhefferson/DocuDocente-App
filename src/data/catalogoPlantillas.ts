@@ -126,12 +126,12 @@ export const definicionDelCatalogo = (tipo: TipoCatalogo, variante: VarianteCabe
 export const nombreDelCatalogo = (tipo: TipoCatalogo, variante: VarianteCabecera) =>
   `${BASES[tipo].nombre} · ${variante === 'A' ? 'sin logo FISME' : 'con logo FISME'}`;
 
-// I, II, III… o A, B, C… para las secciones con título (apertura y cierre no se numeran)
-const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
 
+/** Marca de la sección n (desde 0): "III." · "C)" · "3." */
+export const marcaSeccion = (numeracion: DefinicionPlantilla['numeracion'], n: number): string =>
+  numeracion === 'romanos' ? `${ROMANOS[n] ?? n + 1}.` : numeracion === 'letras' ? `${String.fromCharCode(65 + n)})` : `${n + 1}.`;
+
+// Títulos numerados para la vista previa (apertura y cierre no se numeran)
 export const titulosNumerados = (definicion: DefinicionPlantilla): string[] =>
-  definicion.secciones
-    .filter((s) => s.titulo)
-    .map((s, i) =>
-      definicion.numeracion === 'romanos' ? `${ROMANOS[i]}. ${s.titulo}` : `${String.fromCharCode(65 + i)}) ${s.titulo}`
-    );
+  definicion.secciones.filter((s) => s.titulo).map((s, i) => `${marcaSeccion(definicion.numeracion, i)} ${s.titulo}`);

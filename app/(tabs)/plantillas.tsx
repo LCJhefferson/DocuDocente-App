@@ -7,6 +7,10 @@ import { NormaFormato, Plantilla } from '../../src/models/Plantilla';
 import { plantillaService } from '../../src/services/plantillaService';
 import { esLogoIncluido, fuenteLogo, guardarLogoPermanente } from '../../src/utils/logos';
 import { definicionDesdeEncabezado } from '../../src/utils/plantillaBase';
+import { ResultadoAnalisis } from '../../src/components/plantillas/ResultadoAnalisis';
+import { DefinicionPlantilla } from '../../src/models/Plantilla';
+import { importarWordService } from '../../src/services/importarWordService';
+import { AnalisisDocx } from '../../src/utils/analizarDocx';
 import {
   CATALOGO,
   TipoCatalogo,
@@ -31,6 +35,11 @@ export default function PlantillasScreen() {
   const [formatoSeleccionado, setFormatoSeleccionado] = useState<NormaFormato>('Oficio');
 
   const formatosDisponibles: NormaFormato[] = ['Oficio', 'APA 7'];
+
+  // Subir una plantilla en Word
+  const [analisisWord, setAnalisisWord] = useState<AnalisisDocx | null>(null);
+  const [nombreWord, setNombreWord] = useState('');
+  const [importando, setImportando] = useState(false);
 
   // Cabecera elegida en cada plantilla del catálogo (A: sin logo FISME, B: con logo FISME)
   const [variantes, setVariantes] = useState<Record<TipoCatalogo, VarianteCabecera>>({ unidad: 'B', fin_ciclo: 'B' });
@@ -134,6 +143,34 @@ export default function PlantillasScreen() {
     }
   };
 
+  const subirWord = async () => {
+    setImportando(true);
+    try {
+      const resultado = await importarWordService.elegirYAnalizar();
+      if (resultado) {
+        setNombreWord(resultado.nombre);
+        setAnalisisWord(resultado.analisis);
+      }
+    } catch (error: any) {
+      console.error('[Plantillas] Error al analizar Word:', error);
+      Alert.alert('No se pudo analizar', error?.message || 'Revisa que el archivo sea un Word (.docx).');
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const guardarImportada = async (nombre: string, definicion: DefinicionPlantilla) => {
+    try {
+      await plantillaService.guardar({ nombre, tipo: 'importada', definicion, esPredeterminada: true });
+      setAnalisisWord(null);
+      await cargarPlantillas();
+      Alert.alert('Plantilla guardada', `"${nombre}" quedó como tu plantilla predeterminada.`);
+    } catch (error) {
+      console.error('[Plantillas] Error al guardar importada:', error);
+      Alert.alert('Error', 'No se pudo guardar la plantilla.');
+    }
+  };
+
   const abrirPrevisualizacion = (item: Plantilla) => {
     setPlantillaPreview(item);
     setModalVisible(true);
@@ -181,6 +218,10 @@ export default function PlantillasScreen() {
         <View style={styles.listContainer}>
           <TouchableOpacity style={styles.btnPrimary} onPress={() => setMostrarFormulario(true)}>
             <Text style={styles.btnPrimaryText}>+ Crear Nueva Plantilla</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.btnWord, importando && { opacity: 0.6 }]} onPress={subirWord} disabled={importando}>
+            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <Text style={styles.btnWordText}>{importando ? 'Analizando documento…' : 'Subir plantilla en Word'}</Text>
           </TouchableOpacity>
           <FlatList data={plantillas} keyExtractor={(item) => item.id} renderItem={renderItem} ListHeaderComponent={
             <View>
@@ -278,6 +319,14 @@ export default function PlantillasScreen() {
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      <ResultadoAnalisis
+        visible={!!analisisWord}
+        nombreInicial={nombreWord}
+        analisis={analisisWord}
+        onCancelar={() => setAnalisisWord(null)}
+        onGuardar={guardarImportada}
+      />
 
       {/* --- MODAL DE PREVISUALIZACIÓN --- */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
@@ -399,6 +448,8 @@ const styles = StyleSheet.create({
   // Botones Generales
   btnPrimary: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   btnPrimaryText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
+  btnWord: { flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#2563EB', paddingVertical: 12, borderRadius: 8, marginTop: 10 },
+  btnWordText: { color: '#2563EB', fontWeight: 'bold', fontSize: 14 },
   btnGuardar: { backgroundColor: '#2563EB', paddingVertical: 16, borderRadius: 8, alignItems: 'center', elevation: 3 },
   btnBack: { alignSelf: 'flex-start', marginBottom: 15, padding: 5 },
   btnBackText: { color: '#4B5563', fontWeight: 'bold', fontSize: 14 },

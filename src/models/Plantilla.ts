@@ -49,7 +49,7 @@ export type Seccion = {
   texto?: string; // texto estándar o por defecto, editable
 };
 
-export type Numeracion = 'romanos' | 'letras'; // I., II. … o A), B) …
+export type Numeracion = 'romanos' | 'letras' | 'numeros'; // I., II. … · A), B) … · 1., 2. …
 
 export type NormaFormato = 'APA 7' | 'Oficio' | 'Otro';
 

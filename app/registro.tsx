@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../src/services/authService';
+import { esCorreoValido, validarContrasena } from '../src/utils/validaciones';
 
 export default function RegistroScreen() {
   const router = useRouter();
@@ -68,6 +69,17 @@ export default function RegistroScreen() {
   const manejarRegistroFinal = async () => {
     if (!correoElectronico.trim() || !contrasena.trim() || !confirmarContrasena.trim()) {
       Alert.alert('Atención', 'Por favor completa todos los campos obligatorios.');
+      return;
+    }
+
+    if (!esCorreoValido(correoElectronico)) {
+      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@untrm.edu.pe.');
+      return;
+    }
+
+    const problemaContrasena = validarContrasena(contrasena.trim());
+    if (problemaContrasena) {
+      Alert.alert('Contraseña débil', problemaContrasena);
       return;
     }
 

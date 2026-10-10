@@ -105,7 +105,13 @@ export class InformeService {
     // Plantilla predeterminada del módulo de plantillas; si no hay, la de la UNTRM
     const [plantilla] = await db.select().from(plantillas).where(eq(plantillas.esPredeterminada, true)).limit(1);
 
-    return { informe, unidades, evidencias: evidenciasCurso, plantilla: plantilla ?? PLANTILLA_UNTRM };
+    return {
+      informe,
+      unidades,
+      evidencias: evidenciasCurso,
+      plantilla: plantilla ?? PLANTILLA_UNTRM,
+      definicion: plantilla?.definicion ?? null,
+    };
   }
 
   /**

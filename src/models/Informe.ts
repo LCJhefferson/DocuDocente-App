@@ -1,3 +1,5 @@
+import type { DefinicionPlantilla } from './Plantilla';
+
 // Tipos del módulo de generación de informes
 
 export const UNIDADES_INFORME = ['Unidad 1', 'Unidad 2', 'Unidad 3'] as const;
@@ -74,4 +76,5 @@ export interface InformeCompleto {
   unidades: ResultadoUnidad[];
   evidencias: EvidenciaInforme[];
   plantilla: PlantillaInforme;
+  definicion?: DefinicionPlantilla | null; // receta de la plantilla predeterminada, si tiene
 }

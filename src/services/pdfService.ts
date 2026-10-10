@@ -2,26 +2,10 @@ import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { EvidenciaInforme, InformeCompleto, UNIDADES_INFORME } from '../models/Informe';
-import { LIMITE_PLAN_MEJORA } from '../utils/estadisticas';
-
-// Evita que un texto escrito por el docente (ej: "<b>") rompa el HTML del PDF
-const escapar = (texto: string | null | undefined) =>
-  (texto ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-// expo-print no puede leer fotos del celular por su ruta: hay que incrustarlas en base64
-const imagenEnBase64 = async (uri: string | null): Promise<string | null> => {
-  if (!uri) return null;
-  try {
-    const base64 = await new File(uri).base64();
-    return `data:image/${uri.toLowerCase().endsWith('.png') ? 'png' : 'jpeg'};base64,${base64}`;
-  } catch {
-    return null; // la imagen se borró del celular -> se omite sin romper el informe
-  }
-};
+import { calcularResumenUnidad, LIMITE_PLAN_MEJORA } from '../utils/estadisticas';
+import { escapar, imagenEnBase64 } from '../utils/htmlPdf';
+import { informeDatosService } from './informeDatosService';
+import { construirHtmlDesdePlantilla } from './plantillaPdfService';
 
 const fotoEnBase64 = (evidencia: EvidenciaInforme) =>
   evidencia.tipoArchivo === 'IMAGE' ? imagenEnBase64(evidencia.rutaArchivoLocal) : Promise.resolve(null);
@@ -37,9 +21,43 @@ const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
   <p>${escapar(u.textoInterpretacion)}</p>`;
 
 /**
- * Construye el HTML del informe con el formato de oficio de la UNTRM
+ * Construye el HTML del informe: con la plantilla predeterminada (si tiene receta) o con el oficio clásico
  */
-export const construirHtmlInforme = async ({ informe, unidades, evidencias, plantilla }: InformeCompleto): Promise<string> => {
+export const construirHtmlInforme = async (datos: InformeCompleto): Promise<string> => {
+  const { informe, unidades, definicion } = datos;
+  if (!definicion || !informe.perfilDocenteId) return construirHtmlClasico(datos);
+
+  const datosInforme = await informeDatosService.reunir({
+    perfilDocenteId: informe.perfilDocenteId,
+    cursoIds: informe.cursoId ? [informe.cursoId] : [],
+    unidades: unidades.map((u) => u.nombreUnidad),
+  });
+  // El informe guarda una copia de las notas: se usa esa, no las actuales
+  for (const dc of datosInforme.cursos) {
+    dc.resultados = unidades.map((u) => ({
+      nombreUnidad: u.nombreUnidad,
+      aprobados: u.cantidadAprobados,
+      desaprobados: u.cantidadDesaprobados,
+      ...calcularResumenUnidad(u.cantidadAprobados, u.cantidadDesaprobados),
+    }));
+  }
+
+  return construirHtmlDesdePlantilla(definicion, datosInforme, {
+    campos: {
+      numero: informe.numeroInforme,
+      a: `${informe.dirigidoANombre}
+${informe.dirigidoACargo}`,
+      de: informe.remitenteNombre,
+      asunto: informe.asunto,
+      fecha: informe.fechaStr,
+    },
+  });
+};
+
+/**
+ * Oficio clásico de la UNTRM (cuando no hay plantilla con receta)
+ */
+const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }: InformeCompleto): Promise<string> => {
   const logo = await imagenEnBase64(plantilla.logoUri);
   const hayPlanMejora = unidades.some((u) => u.porcentajeDesaprobados >= LIMITE_PLAN_MEJORA);
 

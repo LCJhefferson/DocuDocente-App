@@ -4,25 +4,16 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FormularioInforme } from '../../src/components/informes/FormularioInforme';
 import { useInformes } from '../../src/hooks/useInformes';
 import { Informe } from '../../src/models/Informe';
-import { InformeService } from '../../src/services/informeService';
 import { formatearFecha } from '../../src/utils/fechas';
 
-interface CursoInforme {
-  id: string;
-  nombre: string;
-  ciclo: string;
-  semestre: string;
-}
 
 export default function InformesScreen() {
   const router = useRouter();
   // cursoId llega cuando se toca "Generar Reporte" en las opciones de un curso
   const { cursoId } = useLocalSearchParams<{ cursoId?: string }>();
-  const { informes, cargando, cargarInformes, crearInforme, descargarInforme, generandoPdf } = useInformes();
-  const [curso, setCurso] = useState<CursoInforme | null>(null);
+  const { informes, cargando, cargarInformes, descargarInforme, generandoPdf } = useInformes();
   const [busqueda, setBusqueda] = useState('');
 
   // Filtra por nombre del curso o por número de informe
@@ -47,43 +38,21 @@ export default function InformesScreen() {
     }, [cargarInformes])
   );
 
-  // Si viene un curso, lo busca para prellenar el formulario
+  // "Generar reporte" de un curso abre el formulario con ese curso ya elegido
   useEffect(() => {
-    if (!cursoId) {
-      setCurso(null);
-      return;
-    }
-    InformeService.obtenerCurso(cursoId).then(setCurso);
-  }, [cursoId]);
-
-  const cerrarFormulario = () => {
-    setCurso(null);
+    if (!cursoId) return;
     router.setParams({ cursoId: undefined });
-  };
-
-  // ---- Modo formulario ----
-  if (curso) {
-    return (
-      <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-        <FormularioInforme
-          curso={curso}
-          onCancelar={cerrarFormulario}
-          onGuardar={async (datos, unidades) => {
-            const id = await crearInforme(datos, unidades);
-            cerrarFormulario();
-            router.push({ pathname: '/informe/[id]', params: { id } }); // abre la vista previa
-          }}
-        />
-      </SafeAreaView>
-    );
-  }
+    router.push({ pathname: '/informe/nuevo', params: { cursoId } });
+  }, [cursoId, router]);
 
   // ---- Modo historial (diseño Figma: "Historial") ----
   return (
     <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
       {/* HEADER: título centrado + perfil */}
       <View style={styles.header}>
-        <View style={styles.espacioIcono} />
+        <TouchableOpacity style={styles.espacioIcono} onPress={() => router.push('/informe/nuevo')} accessibilityLabel="Nuevo informe">
+          <Ionicons name="add-circle-outline" size={26} color="#1E88E5" />
+        </TouchableOpacity>
         <Text style={styles.titulo}>Historial</Text>
         <TouchableOpacity style={styles.espacioIcono} onPress={() => router.push('/modal')}>
           <Ionicons name="person-outline" size={24} color="#0F172A" />

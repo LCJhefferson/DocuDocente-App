@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/client';
@@ -9,8 +9,34 @@ import {
   Informe,
   InformeCompleto,
   PLANTILLA_UNTRM,
+  ResultadoUnidad,
 } from '../models/Informe';
+import { InformeConPlantilla } from '../models/Plantilla';
 import { calcularResumenUnidad, generarInterpretacion } from '../utils/estadisticas';
+import { DatosInforme } from './informeDatosService';
+
+const sumarPorUnidad = (
+  informeId: string,
+  resultados: { nombreUnidad: string; aprobados: number; desaprobados: number }[]
+): ResultadoUnidad[] => {
+  const totales = new Map<string, { aprobados: number; desaprobados: number }>();
+  for (const r of resultados) {
+    const t = totales.get(r.nombreUnidad) ?? { aprobados: 0, desaprobados: 0 };
+    totales.set(r.nombreUnidad, { aprobados: t.aprobados + r.aprobados, desaprobados: t.desaprobados + r.desaprobados });
+  }
+  return [...totales.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([nombreUnidad, t]) => {
+    const resumen = calcularResumenUnidad(t.aprobados, t.desaprobados);
+    return {
+      id: `${informeId}-${nombreUnidad}`,
+      nombreUnidad,
+      cantidadAprobados: t.aprobados,
+      cantidadDesaprobados: t.desaprobados,
+      porcentajeAprobados: resumen.porcentajeAprobados,
+      porcentajeDesaprobados: resumen.porcentajeDesaprobados,
+      textoInterpretacion: generarInterpretacion(nombreUnidad, t.aprobados, t.desaprobados),
+    };
+  });
+};
 
 export class InformeService {
   /**
@@ -88,11 +114,16 @@ export class InformeService {
 
     const informe = filas[0] as Informe;
 
-    const unidades = await db
+    const filasUnidades = await db
       .select()
       .from(resultadosUnidad)
       .where(eq(resultadosUnidad.informeId, informeId))
       .orderBy(resultadosUnidad.nombreUnidad);
+
+    // Informes hechos con plantilla: las notas están en su contenido (se suman por unidad si hay varios cursos)
+    const unidades: ResultadoUnidad[] = informe.contenido && filasUnidades.length === 0
+      ? sumarPorUnidad(informe.id, Object.values(informe.contenido.resultados).flat())
+      : filasUnidades;
 
     const evidenciasCurso = informe.cursoId
       ? await db
@@ -105,26 +136,67 @@ export class InformeService {
     // Plantilla predeterminada del módulo de plantillas; si no hay, la de la UNTRM
     const [plantilla] = await db.select().from(plantillas).where(eq(plantillas.esPredeterminada, true)).limit(1);
 
-    return { informe, unidades, evidencias: evidenciasCurso, plantilla: plantilla ?? PLANTILLA_UNTRM };
+    return {
+      informe,
+      unidades,
+      evidencias: evidenciasCurso,
+      plantilla: plantilla ?? PLANTILLA_UNTRM,
+      definicion: plantilla?.definicion ?? null,
+    };
   }
 
   /**
-   * Notas guardadas en "Añadir notas" para el curso (aún no copiadas a un informe)
+   * Guarda un informe hecho con plantilla (uno o varios cursos). Devuelve su id.
    */
-  static async obtenerNotasDelCurso(cursoId: string) {
-    return db
-      .select()
-      .from(resultadosUnidad)
-      .where(and(eq(resultadosUnidad.cursoId, cursoId), isNull(resultadosUnidad.informeId)));
+  static async crearInformeConPlantilla(entrada: {
+    perfilDocenteId: string;
+    plantillaId: string | null;
+    datos: DatosInforme;
+    guardado: InformeConPlantilla;
+  }): Promise<string> {
+    const { datos, guardado } = entrada;
+    const lineas = (clave: string) => (guardado.contenido.campos[clave] ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+    const [aNombre = '', ...aCargo] = lineas('a');
+    const informeId = uuidv4();
+    const ahora = new Date().toISOString();
+
+    await db.insert(informes).values({
+      id: informeId,
+      perfilDocenteId: entrada.perfilDocenteId,
+      cursoId: datos.cursos[0]?.curso.id ?? null,
+      plantillaId: entrada.plantillaId,
+      numeroInforme: guardado.contenido.campos.numero ?? datos.numeroSugerido,
+      dirigidoANombre: aNombre,
+      dirigidoACargo: aCargo.join(' '),
+      remitenteNombre: lineas('de')[0] ?? datos.valores.docente,
+      asunto: guardado.contenido.campos.asunto ?? '',
+      fechaStr: guardado.contenido.campos.fecha ?? datos.fecha,
+      nombreCurso: datos.cursos.map((c) => c.curso.nombre).join(' · '),
+      ciclo: [...new Set(datos.cursos.map((c) => c.curso.ciclo))].join(', '),
+      semestre: datos.valores.semestre,
+      totalEstudiantes: Math.max(0, ...datos.cursos.flatMap((c) => c.resultados.map((r) => r.total))),
+      estado: 'COMPLETADO',
+      contenido: guardado,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    });
+    return informeId;
   }
 
   /**
-   * Datos del curso para prellenar el formulario del informe
+   * Lo escrito en el último informe con plantilla del docente (para no volver a escribirlo)
    */
-  static async obtenerCurso(cursoId: string) {
-    const filas = await db.select().from(cursos).where(eq(cursos.id, cursoId));
-    return filas[0] ?? null;
+  static async obtenerUltimoContenido(perfilDocenteId: string): Promise<InformeConPlantilla | null> {
+    const [fila] = await db
+      .select({ contenido: informes.contenido })
+      .from(informes)
+      .where(and(eq(informes.perfilDocenteId, perfilDocenteId), isNotNull(informes.contenido)))
+      .orderBy(desc(informes.creadoEn))
+      .limit(1);
+    return fila?.contenido ?? null;
   }
+
+
 
   /**
    * Elimina un informe (sus resultados se borran solos por ON DELETE CASCADE)

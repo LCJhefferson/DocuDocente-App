@@ -1,30 +1,27 @@
 import { Ionicons } from '@expo/vector-icons'; // Importamos los íconos
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, FlatList, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-interface Plantilla {
-  id: string; 
-  nombreInstitucion: string;
-  nombreFacultad: string;
-  tituloAnoEncabezado: string;
-  logoUri: string;
-  formato: string; // Agregamos el formato a la base de datos
-  esPredeterminada: boolean;
-}
+import { NormaFormato, Plantilla } from '../../src/models/Plantilla';
+import { plantillaService } from '../../src/services/plantillaService';
+import { esLogoIncluido, fuenteLogo, guardarLogoPermanente } from '../../src/utils/logos';
+import { definicionDesdeEncabezado } from '../../src/utils/plantillaBase';
+import { ResultadoAnalisis } from '../../src/components/plantillas/ResultadoAnalisis';
+import { DefinicionPlantilla } from '../../src/models/Plantilla';
+import { importarWordService } from '../../src/services/importarWordService';
+import { AnalisisDocx } from '../../src/utils/analizarDocx';
+import {
+  CATALOGO,
+  TipoCatalogo,
+  VarianteCabecera,
+  definicionDelCatalogo,
+  nombreDelCatalogo,
+  titulosNumerados,
+} from '../../src/data/catalogoPlantillas';
 
 export default function PlantillasScreen() {
-  const [plantillas, setPlantillas] = useState<Plantilla[]>([
-    {
-      id: '1',
-      nombreInstitucion: 'UNIVERSIDAD NACIONAL TORIBIO RODRÍGUEZ DE MENDOZA DE AMAZONAS',
-      nombreFacultad: 'Facultad de Ingeniería de Sistemas y Mecánica Eléctrica',
-      tituloAnoEncabezado: '"Año de la Esperanza y el Fortalecimiento de la Democracia"',
-      logoUri: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Logo-2016-solo-ok.png/960px-Logo-2016-solo-ok.png',
-      formato: 'APA 7',
-      esPredeterminada: true,
-    }
-  ]);
+  const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -35,9 +32,32 @@ export default function PlantillasScreen() {
   const [nombreFacultad, setNombreFacultad] = useState('');
   const [tituloAnoEncabezado, setTituloAnoEncabezado] = useState('');
   const [logoUri, setLogoUri] = useState('');
-  const [formatoSeleccionado, setFormatoSeleccionado] = useState('APA 7'); // Estado para el formato
+  const [formatoSeleccionado, setFormatoSeleccionado] = useState<NormaFormato>('Oficio');
 
-  const formatosDisponibles = ['APA 7', 'IEEE', 'Vancouver'];
+  const formatosDisponibles: NormaFormato[] = ['Oficio', 'APA 7'];
+
+  // Subir una plantilla en Word
+  const [analisisWord, setAnalisisWord] = useState<AnalisisDocx | null>(null);
+  const [nombreWord, setNombreWord] = useState('');
+  const [importando, setImportando] = useState(false);
+
+  // Cabecera elegida en cada plantilla del catálogo (A: sin logo FISME, B: con logo FISME)
+  const [variantes, setVariantes] = useState<Record<TipoCatalogo, VarianteCabecera>>({ unidad: 'B', fin_ciclo: 'B' });
+
+  // Lee las plantillas guardadas cada vez que se entra a la pestaña
+  const cargarPlantillas = useCallback(async () => {
+    try {
+      setPlantillas(await plantillaService.listar());
+    } catch (error) {
+      console.error('[Plantillas] Error al cargar:', error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarPlantillas();
+    }, [cargarPlantillas])
+  );
 
   const seleccionarLogo = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -58,29 +78,97 @@ export default function PlantillasScreen() {
       return;
     }
 
-    const nuevaPlantilla = {
-      id: Date.now().toString(),
-      nombreInstitucion,
-      nombreFacultad,
-      tituloAnoEncabezado,
-      logoUri,
-      formato: formatoSeleccionado,
-      esPredeterminada: true 
-    };
+    try {
+      await plantillaService.guardar({
+        nombre: nombreFacultad.trim(),
+        tipo: 'personalizada',
+        definicion: definicionDesdeEncabezado({
+          institucion: nombreInstitucion,
+          facultad: nombreFacultad,
+          lema: tituloAnoEncabezado,
+          logo: logoUri ? guardarLogoPermanente(logoUri) : null,
+          norma: formatoSeleccionado,
+        }),
+        esPredeterminada: true,
+      });
+      await cargarPlantillas();
 
-    const listaActualizada = plantillas.map(p => ({ ...p, esPredeterminada: false }));
-    setPlantillas([nuevaPlantilla, ...listaActualizada]);
-    
-    setNombreInstitucion(''); setNombreFacultad(''); setTituloAnoEncabezado(''); setLogoUri(''); setFormatoSeleccionado('APA 7');
-    setMostrarFormulario(false);
-    Alert.alert('Éxito', 'Plantilla guardada y asignada como predeterminada.');
+      setNombreInstitucion(''); setNombreFacultad(''); setTituloAnoEncabezado(''); setLogoUri(''); setFormatoSeleccionado('Oficio');
+      setMostrarFormulario(false);
+      Alert.alert('Éxito', 'Plantilla guardada y asignada como predeterminada.');
+    } catch (error) {
+      console.error('[Plantillas] Error al guardar:', error);
+      Alert.alert('Error', 'No se pudo guardar la plantilla.');
+    }
   };
 
-  const hacerPredeterminada = (id: string) => {
-    const listaActualizada = plantillas.map(p => ({
-      ...p, esPredeterminada: p.id === id
-    }));
-    setPlantillas(listaActualizada);
+  const hacerPredeterminada = async (id: string) => {
+    await plantillaService.marcarPredeterminada(id);
+    await cargarPlantillas();
+  };
+
+  const eliminarPlantilla = (item: Plantilla) => {
+    Alert.alert('Eliminar plantilla', `¿Eliminar "${item.nombre}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          await plantillaService.eliminar(item.id);
+          await cargarPlantillas();
+        },
+      },
+    ]);
+  };
+
+  const plantillaDelCatalogo = (tipo: TipoCatalogo): Plantilla => ({
+    id: `catalogo-${tipo}`,
+    nombre: nombreDelCatalogo(tipo, variantes[tipo]),
+    tipo,
+    definicion: definicionDelCatalogo(tipo, variantes[tipo]),
+    esPredeterminada: false,
+    creadoEn: '',
+  });
+
+  // Guarda una copia del catálogo como plantilla propia del docente y la deja predeterminada
+  const usarDelCatalogo = async (tipo: TipoCatalogo) => {
+    const { nombre, definicion } = plantillaDelCatalogo(tipo);
+    try {
+      await plantillaService.guardar({ nombre, tipo, definicion, esPredeterminada: true });
+      await cargarPlantillas();
+      Alert.alert('Plantilla lista', `"${nombre}" quedó como tu plantilla predeterminada.`);
+    } catch (error) {
+      console.error('[Plantillas] Error al usar del catálogo:', error);
+      Alert.alert('Error', 'No se pudo guardar la plantilla.');
+    }
+  };
+
+  const subirWord = async () => {
+    setImportando(true);
+    try {
+      const resultado = await importarWordService.elegirYAnalizar();
+      if (resultado) {
+        setNombreWord(resultado.nombre);
+        setAnalisisWord(resultado.analisis);
+      }
+    } catch (error: any) {
+      console.error('[Plantillas] Error al analizar Word:', error);
+      Alert.alert('No se pudo analizar', error?.message || 'Revisa que el archivo sea un Word (.docx).');
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const guardarImportada = async (nombre: string, definicion: DefinicionPlantilla) => {
+    try {
+      await plantillaService.guardar({ nombre, tipo: 'importada', definicion, esPredeterminada: true });
+      setAnalisisWord(null);
+      await cargarPlantillas();
+      Alert.alert('Plantilla guardada', `"${nombre}" quedó como tu plantilla predeterminada.`);
+    } catch (error) {
+      console.error('[Plantillas] Error al guardar importada:', error);
+      Alert.alert('Error', 'No se pudo guardar la plantilla.');
+    }
   };
 
   const abrirPrevisualizacion = (item: Plantilla) => {
@@ -91,9 +179,9 @@ export default function PlantillasScreen() {
   const renderItem = ({ item }: { item: Plantilla }) => (
     <View style={[styles.cardList, item.esPredeterminada && styles.cardListActive]}>
       <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle}>{item.nombreInstitucion}</Text>
-        <Text style={styles.cardSubtitle}>{item.nombreFacultad}</Text>
-        <Text style={styles.cardFormatText}>Formato: {item.formato}</Text>
+        <Text style={styles.cardTitle}>{item.nombre}</Text>
+        <Text style={styles.cardSubtitle}>{item.definicion.cabecera.textoIzquierdo.join(' ')}</Text>
+        <Text style={styles.cardFormatText}>Formato: {item.definicion.formato.norma}</Text>
         {item.esPredeterminada && (
           <View style={styles.badge}><Text style={styles.badgeText}>Predeterminada</Text></View>
         )}
@@ -107,6 +195,12 @@ export default function PlantillasScreen() {
         {!item.esPredeterminada && (
           <TouchableOpacity style={styles.btnActionList} onPress={() => hacerPredeterminada(item.id)}>
             <Text style={styles.btnActionListText}>Usar</Text>
+          </TouchableOpacity>
+        )}
+
+        {!item.esPredeterminada && (
+          <TouchableOpacity style={styles.btnVer} onPress={() => eliminarPlantilla(item)} accessibilityLabel="Eliminar plantilla">
+            <Ionicons name="trash-outline" size={16} color="#B91C1C" />
           </TouchableOpacity>
         )}
       </View>
@@ -125,7 +219,43 @@ export default function PlantillasScreen() {
           <TouchableOpacity style={styles.btnPrimary} onPress={() => setMostrarFormulario(true)}>
             <Text style={styles.btnPrimaryText}>+ Crear Nueva Plantilla</Text>
           </TouchableOpacity>
-          <FlatList data={plantillas} keyExtractor={(item) => item.id} renderItem={renderItem} contentContainerStyle={{ paddingBottom: 20, marginTop: 15 }} showsVerticalScrollIndicator={false} />
+          <TouchableOpacity style={[styles.btnWord, importando && { opacity: 0.6 }]} onPress={subirWord} disabled={importando}>
+            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <Text style={styles.btnWordText}>{importando ? 'Analizando documento…' : 'Subir plantilla en Word'}</Text>
+          </TouchableOpacity>
+          <FlatList data={plantillas} keyExtractor={(item) => item.id} renderItem={renderItem} ListHeaderComponent={
+            <View>
+              <Text style={styles.seccionTitulo}>Catálogo</Text>
+              {CATALOGO.map((c) => (
+                <View key={c.tipo} style={styles.cardCatalogo}>
+                  <Text style={styles.cardTitle}>{c.nombre}</Text>
+                  <Text style={styles.cardSubtitle}>{c.descripcion}</Text>
+                  <View style={styles.formatRow}>
+                    {(['A', 'B'] as VarianteCabecera[]).map((v) => (
+                      <TouchableOpacity
+                        key={v}
+                        style={[styles.formatBtn, variantes[c.tipo] === v && styles.formatBtnActive]}
+                        onPress={() => setVariantes((actual) => ({ ...actual, [c.tipo]: v }))}
+                      >
+                        <Text style={[styles.formatBtnText, variantes[c.tipo] === v && styles.formatBtnTextActive]}>
+                          {v === 'A' ? 'Sin logo FISME' : 'Con logo FISME'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={[styles.actionButtonsRow, { marginTop: 10, justifyContent: 'flex-end' }]}>
+                    <TouchableOpacity style={styles.btnVer} onPress={() => abrirPrevisualizacion(plantillaDelCatalogo(c.tipo))}>
+                      <Text style={styles.btnVerText}>Ver</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnActionList} onPress={() => usarDelCatalogo(c.tipo)}>
+                      <Text style={styles.btnActionListText}>Usar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              <Text style={styles.seccionTitulo}>Mis plantillas</Text>
+            </View>
+          } ListEmptyComponent={<Text style={styles.subtitle}>Aún no hay plantillas. Crea la primera con el botón de arriba.</Text>} contentContainerStyle={{ paddingBottom: 20, marginTop: 15 }} showsVerticalScrollIndicator={false} />
         </View>
       ) : (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -190,6 +320,14 @@ export default function PlantillasScreen() {
         </ScrollView>
       )}
 
+      <ResultadoAnalisis
+        visible={!!analisisWord}
+        nombreInicial={nombreWord}
+        analisis={analisisWord}
+        onCancelar={() => setAnalisisWord(null)}
+        onGuardar={guardarImportada}
+      />
+
       {/* --- MODAL DE PREVISUALIZACIÓN --- */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
@@ -204,38 +342,52 @@ export default function PlantillasScreen() {
                 {/* ENCABEZADO SIMULADO */}
                 <View style={styles.headerOficialContainer}>
                   <View style={styles.headerTopRow}>
-                    {plantillaPreview.logoUri ? (
-                      <Image source={{ uri: plantillaPreview.logoUri }} style={styles.logoOficial} resizeMode="contain" />
+                    {plantillaPreview.definicion.cabecera.logoIzquierdo ? (
+                      <Image
+                        source={fuenteLogo(plantillaPreview.definicion.cabecera.logoIzquierdo)}
+                        style={plantillaPreview.definicion.cabecera.logoIzquierdo === 'untrm' ? styles.logoHorizontal : styles.logoOficial}
+                        resizeMode="contain"
+                      />
                     ) : (
                       <View style={styles.logoPlaceholder}><Text style={{fontSize:8, color:'#9CA3AF'}}>LOGO</Text></View>
                     )}
-                    <View style={styles.separatorVertical}></View>
-                    <View style={styles.universidadCol}>
-                      <Text style={styles.univTextBold}>{plantillaPreview.nombreInstitucion.toUpperCase()}</Text>
-                    </View>
+                    {/* El logo horizontal de la UNTRM ya trae el nombre: no se repite el texto */}
+                    {!esLogoIncluido(plantillaPreview.definicion.cabecera.logoIzquierdo ?? '') && (
+                      <>
+                        <View style={styles.separatorVertical}></View>
+                        <View style={styles.universidadCol}>
+                          <Text style={styles.univTextBold}>{plantillaPreview.definicion.cabecera.textoIzquierdo.join('\n').toUpperCase()}</Text>
+                        </View>
+                      </>
+                    )}
                     <View style={styles.facultadCol}>
-                      <Text style={styles.facultadText}>{plantillaPreview.nombreFacultad}</Text>
+                      <Text style={styles.facultadText}>{plantillaPreview.definicion.cabecera.textoDerecho.join('\n')}</Text>
                     </View>
+                    {plantillaPreview.definicion.cabecera.logoDerecho && (
+                      <Image source={fuenteLogo(plantillaPreview.definicion.cabecera.logoDerecho)} style={styles.logoOficial} resizeMode="contain" />
+                    )}
                   </View>
-                  <Text style={styles.anioText}>{plantillaPreview.tituloAnoEncabezado}</Text>
+                  {plantillaPreview.definicion.cabecera.lema && (
+                    <Text style={styles.anioText}>"{plantillaPreview.definicion.cabecera.lema}"</Text>
+                  )}
                   <View style={styles.lineaDelgada} />
                 </View>
 
                 {/* CUERPO SIMULADO */}
                 <View style={styles.bodyApa}>
-                   <Text style={styles.apaPlaceholderText}>[Cuerpo del documento en formato {plantillaPreview.formato}]</Text>
+                   {titulosNumerados(plantillaPreview.definicion).map((titulo) => (
+                     <Text key={titulo} style={styles.seccionPreview}>{titulo}</Text>
+                   ))}
+                   <Text style={styles.apaPlaceholderText}>Formato: {plantillaPreview.definicion.formato.norma}</Text>
                 </View>
 
                 {/* PIE DE PÁGINA OFICIAL POR DEFECTO */}
                 <View style={styles.footerOficialContainer}>
                   <View style={styles.lineaGruesaFooter} />
                   <View style={styles.lineaDelgadaFooter} />
-                  <Text style={styles.footerInfoText}>
-                    Jr. Libertad N° 1300, Teléfono 041-310116, Bagua-Amazonas-Perú
-                  </Text>
-                  <Text style={styles.footerInfoTextBold}>
-                    E-mail: fisme@untrm.edu.pe / www.untrm.edu.pe
-                  </Text>
+                  {plantillaPreview.definicion.pie.lineas.map((linea, i) => (
+                    <Text key={i} style={i === 0 ? styles.footerInfoText : styles.footerInfoTextBold}>{linea}</Text>
+                  ))}
                 </View>
 
               </ScrollView>
@@ -257,6 +409,9 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   
   // Lista
+  seccionTitulo: { fontSize: 13, fontWeight: 'bold', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8, marginBottom: 8 },
+  cardCatalogo: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 12, elevation: 1, gap: 6 },
+  seccionPreview: { fontFamily: 'serif', fontSize: 10, fontWeight: 'bold', color: '#111827', alignSelf: 'flex-start', marginBottom: 6 },
   cardList: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 12, elevation: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 4, borderLeftColor: '#D1D5DB' },
   cardListActive: { borderLeftColor: '#2563EB', backgroundColor: '#EFF6FF' },
   cardInfo: { flex: 1, paddingRight: 10 },
@@ -293,6 +448,8 @@ const styles = StyleSheet.create({
   // Botones Generales
   btnPrimary: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   btnPrimaryText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
+  btnWord: { flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#2563EB', paddingVertical: 12, borderRadius: 8, marginTop: 10 },
+  btnWordText: { color: '#2563EB', fontWeight: 'bold', fontSize: 14 },
   btnGuardar: { backgroundColor: '#2563EB', paddingVertical: 16, borderRadius: 8, alignItems: 'center', elevation: 3 },
   btnBack: { alignSelf: 'flex-start', marginBottom: 15, padding: 5 },
   btnBackText: { color: '#4B5563', fontWeight: 'bold', fontSize: 14 },
@@ -311,6 +468,7 @@ const styles = StyleSheet.create({
   headerOficialContainer: { width: '100%' },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
   logoOficial: { width: 45, height: 45, marginRight: 10 },
+  logoHorizontal: { width: 130, height: 38, marginRight: 10 },
   logoPlaceholder: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#E5E7EB', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
   separatorVertical: { width: 1, height: 45, backgroundColor: '#D1D5DB', marginRight: 10 },
   universidadCol: { flex: 1 },
@@ -321,7 +479,7 @@ const styles = StyleSheet.create({
   lineaDelgada: { height: 1, backgroundColor: '#9CA3AF', width: '100%' },
   
   // Cuerpo Preview
-  bodyApa: { flex: 1, justifyContent: 'center', alignItems: 'center', marginVertical: 40 },
+  bodyApa: { flex: 1, justifyContent: 'flex-start', alignItems: 'flex-start', marginVertical: 24 },
   apaPlaceholderText: { fontFamily: 'serif', color: '#9CA3AF', fontSize: 12, textAlign: 'center' },
 
   // Pie de Página Preview (NUEVO)

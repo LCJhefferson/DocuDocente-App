@@ -1,3 +1,5 @@
+import type { DefinicionPlantilla, InformeConPlantilla } from './Plantilla';
+
 // Tipos del módulo de generación de informes
 
 export const UNIDADES_INFORME = ['Unidad 1', 'Unidad 2', 'Unidad 3'] as const;
@@ -33,6 +35,7 @@ export interface Informe extends Omit<EntradaCrearInforme, 'perfilDocenteId' | '
   totalEstudiantes: number;
   estado: EstadoInforme;
   creadoEn: string;
+  contenido?: InformeConPlantilla | null; // informes hechos con plantilla
 }
 
 export interface ResultadoUnidad extends EntradaResultadoUnidad {
@@ -74,4 +77,5 @@ export interface InformeCompleto {
   unidades: ResultadoUnidad[];
   evidencias: EvidenciaInforme[];
   plantilla: PlantillaInforme;
+  definicion?: DefinicionPlantilla | null; // receta de la plantilla predeterminada, si tiene
 }

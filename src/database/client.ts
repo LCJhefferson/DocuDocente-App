@@ -75,6 +75,28 @@ const migrarResultadosUnidad = () => {
 };
 
 /**
+ * BD creadas antes de las plantillas inteligentes: agrega nombre, tipo y definicion (JSON)
+ */
+const migrarPlantillas = () => {
+  const columnas = expoDb.getAllSync<{ name: string }>('PRAGMA table_info(plantillas);').map((c) => c.name);
+  const faltantes = [
+    ['nombre', 'TEXT'],
+    ['tipo', "TEXT NOT NULL DEFAULT 'personalizada'"],
+    ['definicion', 'TEXT'],
+  ].filter(([nombre]) => !columnas.includes(nombre));
+
+  for (const [nombre, tipo] of faltantes) {
+    expoDb.execSync(`ALTER TABLE plantillas ADD COLUMN ${nombre} ${tipo};`);
+  }
+  if (faltantes.length) console.log('[DB] plantillas migrada.');
+
+  const columnasInformes = expoDb.getAllSync<{ name: string }>('PRAGMA table_info(informes);').map((c) => c.name);
+  if (!columnasInformes.includes('contenido')) {
+    expoDb.execSync('ALTER TABLE informes ADD COLUMN contenido TEXT;');
+  }
+};
+
+/**
  * Inicialización de las tablas de SQLite y siembra de datos base
  */
 export const initDatabase = async (): Promise<void> => {
@@ -120,6 +142,9 @@ export const initDatabase = async (): Promise<void> => {
         logo_uri TEXT,
         titulo_ano_encabezado TEXT NOT NULL,
         es_predeterminada INTEGER NOT NULL DEFAULT 0,
+        nombre TEXT,
+        tipo TEXT NOT NULL DEFAULT 'personalizada',
+        definicion TEXT,
         creado_en TEXT NOT NULL
       );
 
@@ -139,6 +164,7 @@ export const initDatabase = async (): Promise<void> => {
         semestre TEXT NOT NULL,
         total_estudiantes INTEGER NOT NULL,
         estado TEXT NOT NULL DEFAULT 'BORRADOR',
+        contenido TEXT,
         creado_en TEXT NOT NULL,
         actualizado_en TEXT NOT NULL
       );
@@ -183,6 +209,7 @@ export const initDatabase = async (): Promise<void> => {
     `);
 
     migrarResultadosUnidad();
+    migrarPlantillas();
 
     // AUTO-SIEMBRA: Garantiza que la cuenta y perfil por defecto existan en SQLite
     const perfiles = expoDb.getAllSync('SELECT id FROM perfiles_docente LIMIT 1;');

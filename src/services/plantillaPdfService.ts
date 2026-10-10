@@ -1,18 +1,10 @@
 // Genera el HTML del informe recorriendo las secciones de una plantilla (models/Plantilla).
 // Cada tipo de sección tiene su función de dibujo; los datos vienen de informeDatosService.
-import { Cabecera, DefinicionPlantilla, Pie, Seccion, TipoSeccion } from '../models/Plantilla';
+import { Cabecera, ContenidoInforme, DefinicionPlantilla, Pie, Seccion } from '../models/Plantilla';
 import { generarInterpretacion, LIMITE_PLAN_MEJORA } from '../utils/estadisticas';
 import { escapar, imagenEnBase64 } from '../utils/htmlPdf';
 import { reemplazarMarcadores, unidadEnRomano } from '../utils/informeTexto';
 import { DatosCurso, DatosInforme } from './informeDatosService';
-
-/** Lo que el docente revisa o escribe antes de generar (paso 6 del plan) */
-export type ContenidoInforme = {
-  campos: Record<string, string>; // valor final por clave: numero, a, de, asunto, ref, fecha
-  textos?: Partial<Record<TipoSeccion, string>>; // reemplaza el texto de una sección
-  metodologias?: Record<string, string>; // por id de curso, una línea por punto
-  documentacion?: string[];
-};
 
 const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz';

@@ -89,6 +89,11 @@ const migrarPlantillas = () => {
     expoDb.execSync(`ALTER TABLE plantillas ADD COLUMN ${nombre} ${tipo};`);
   }
   if (faltantes.length) console.log('[DB] plantillas migrada.');
+
+  const columnasInformes = expoDb.getAllSync<{ name: string }>('PRAGMA table_info(informes);').map((c) => c.name);
+  if (!columnasInformes.includes('contenido')) {
+    expoDb.execSync('ALTER TABLE informes ADD COLUMN contenido TEXT;');
+  }
 };
 
 /**
@@ -159,6 +164,7 @@ export const initDatabase = async (): Promise<void> => {
         semestre TEXT NOT NULL,
         total_estudiantes INTEGER NOT NULL,
         estado TEXT NOT NULL DEFAULT 'BORRADOR',
+        contenido TEXT,
         creado_en TEXT NOT NULL,
         actualizado_en TEXT NOT NULL
       );

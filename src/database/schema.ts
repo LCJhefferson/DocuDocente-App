@@ -1,5 +1,5 @@
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DefinicionPlantilla } from '../models/Plantilla';
+import type { DefinicionPlantilla, InformeConPlantilla } from '../models/Plantilla';
 
 // 1. DOMINIO DE AUTENTICACIÓN (Cuentas y Seguridad)
 export const cuentasAutenticacion = sqliteTable('cuentas_autenticacion', {
@@ -73,6 +73,7 @@ export const informes = sqliteTable('informes', {
   semestre: text('semestre').notNull(),
   totalEstudiantes: integer('total_estudiantes').notNull(),
   estado: text('estado', { enum: ['BORRADOR', 'COMPLETADO', 'SINCRONIZADO'] }).default('BORRADOR').notNull(),
+  contenido: text('contenido', { mode: 'json' }).$type<InformeConPlantilla>(),
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
 });

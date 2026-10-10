@@ -1,4 +1,4 @@
-import type { DefinicionPlantilla } from './Plantilla';
+import type { DefinicionPlantilla, InformeConPlantilla } from './Plantilla';
 
 // Tipos del módulo de generación de informes
 
@@ -35,6 +35,7 @@ export interface Informe extends Omit<EntradaCrearInforme, 'perfilDocenteId' | '
   totalEstudiantes: number;
   estado: EstadoInforme;
   creadoEn: string;
+  contenido?: InformeConPlantilla | null; // informes hechos con plantilla
 }
 
 export interface ResultadoUnidad extends EntradaResultadoUnidad {

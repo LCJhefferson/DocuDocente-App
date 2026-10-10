@@ -84,3 +84,21 @@ export type EntradaPlantilla = Omit<Plantilla, 'id' | 'creadoEn' | 'esPredetermi
   id?: string;
   esPredeterminada?: boolean;
 };
+
+/** Lo que el docente revisa o escribe antes de generar */
+export type ContenidoInforme = {
+  campos: Record<string, string>; // valor final por clave: numero, a, de, asunto, ref, fecha
+  textos?: Partial<Record<TipoSeccion, string>>; // reemplaza el texto de una sección
+  metodologias?: Record<string, string>; // por id de curso, una línea por punto
+  documentacion?: string[];
+};
+
+/** Copia que guarda cada informe: no cambia aunque luego se edite la plantilla o las notas */
+export type InformeConPlantilla = {
+  plantillaNombre: string;
+  definicion: DefinicionPlantilla;
+  cursoIds: string[];
+  unidades: string[];
+  contenido: ContenidoInforme;
+  resultados: Record<string, { nombreUnidad: string; aprobados: number; desaprobados: number }[]>; // por id de curso
+};

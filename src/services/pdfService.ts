@@ -25,6 +25,21 @@ const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
  */
 export const construirHtmlInforme = async (datos: InformeCompleto): Promise<string> => {
   const { informe, unidades, definicion } = datos;
+
+  // Informe hecho con plantilla: usa su propia copia de la plantilla, lo escrito y las notas
+  const guardado = informe.contenido;
+  if (guardado && informe.perfilDocenteId) {
+    const datosGuardados = await informeDatosService.reunir({
+      perfilDocenteId: informe.perfilDocenteId,
+      cursoIds: guardado.cursoIds,
+      unidades: guardado.unidades,
+    });
+    for (const dc of datosGuardados.cursos) {
+      dc.resultados = (guardado.resultados[dc.curso.id] ?? []).map((r) => ({ ...r, ...calcularResumenUnidad(r.aprobados, r.desaprobados) }));
+    }
+    return construirHtmlDesdePlantilla(guardado.definicion, datosGuardados, guardado.contenido);
+  }
+
   if (!definicion || !informe.perfilDocenteId) return construirHtmlClasico(datos);
 
   const datosInforme = await informeDatosService.reunir({
@@ -45,8 +60,7 @@ export const construirHtmlInforme = async (datos: InformeCompleto): Promise<stri
   return construirHtmlDesdePlantilla(definicion, datosInforme, {
     campos: {
       numero: informe.numeroInforme,
-      a: `${informe.dirigidoANombre}
-${informe.dirigidoACargo}`,
+      a: `${informe.dirigidoANombre}\n${informe.dirigidoACargo}`,
       de: informe.remitenteNombre,
       asunto: informe.asunto,
       fecha: informe.fechaStr,

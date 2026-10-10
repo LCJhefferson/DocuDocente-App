@@ -18,7 +18,7 @@ export type AnalisisDocx = {
 };
 
 // ---------- lectura de WordprocessingML ----------
-type Parrafo = { tipo: 'p'; texto: string; crudo: string; centrado: boolean; derecha: boolean; cursiva: boolean; estilo: string; numerado: boolean; imagenes: string[] };
+type Parrafo = { tipo: 'p'; texto: string; crudo: string; centrado: boolean; derecha: boolean; cursiva: boolean; negrita: boolean; estilo: string; numerado: boolean; imagenes: string[] };
 type Tabla = { tipo: 'tbl'; filas: Parrafo[][][] }; // filas -> celdas -> párrafos
 type Bloque = Parrafo | Tabla;
 
@@ -41,6 +41,7 @@ const leerParrafo = (xml: string): Parrafo => {
     centrado: jc === 'center',
     derecha: jc === 'right' || jc === 'end',
     cursiva: /<w:i(?:\s+w:val="(?:1|true)")?\s*\/>/.test(xml),
+    negrita: /<w:b(?:\s+w:val="(?:1|true)")?\s*\/>/.test(xml),
     estilo: xml.match(/<w:pStyle w:val="([^"]+)"/)?.[1] ?? '',
     numerado: /<w:numPr>/.test(xml),
     imagenes: [...xml.matchAll(/r:(?:embed|id)="(rId\d+)"/g)].map((m) => m[1]),
@@ -112,14 +113,18 @@ const TIPOS: [RegExp, TipoSeccion][] = [
 ];
 const tipoPorTitulo = (titulo: string): TipoSeccion => TIPOS.find(([re]) => re.test(titulo))?.[1] ?? 'texto';
 
+// "1. Introducción" es título solo si es corto, sin punto final y en negrita o mayúsculas (si no, es un ítem de lista)
+const esTituloNumerado = (p: Parrafo) =>
+  RE_NUMERO_SECCION.test(p.texto) && p.texto.length < 80 && !/[.;]$/.test(p.texto) && (p.negrita || p.texto === p.texto.toUpperCase());
+
 const esTitulo = (p: Parrafo) =>
-  RE_ROMANO.test(p.texto) || RE_LETRA.test(p.texto) || (/^(Heading|Ttulo|T[ií]tulo)1$/i.test(p.estilo) && p.texto.length < 90);
+  RE_ROMANO.test(p.texto) || RE_LETRA.test(p.texto) || esTituloNumerado(p) || (/^(Heading|Ttulo|T[ií]tulo)1$/i.test(p.estilo) && p.texto.length < 90);
 
 const limpiarTitulo = (p: Parrafo) =>
   (p.texto.match(RE_ROMANO)?.[2] ?? p.texto.match(RE_LETRA)?.[2] ?? p.texto.match(RE_NUMERO_SECCION)?.[2] ?? p.texto).replace(/:\s*$/, '').trim();
 
 const numeracionDe = (p: Parrafo): Numeracion | null =>
-  RE_ROMANO.test(p.texto) ? 'romanos' : RE_LETRA.test(p.texto) ? 'letras' : RE_NUMERO_SECCION.test(p.texto) || p.numerado ? 'numeros' : null;
+  RE_ROMANO.test(p.texto) ? 'romanos' : RE_LETRA.test(p.texto) ? 'letras' : esTituloNumerado(p) || RE_NUMERO_SECCION.test(p.texto) || p.numerado ? 'numeros' : null;
 
 // El valor con más "peso" (por defecto, 1 por aparición)
 const masFrecuente = (valores: string[], pesos?: number[]) => {

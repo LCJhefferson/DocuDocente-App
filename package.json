@@ -50,7 +50,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test:plantillas": "esbuild scripts/probar-plantillas.ts --bundle --platform=node --log-level=error --loader:.png=file --outdir=node_modules/.cache/pruebas --alias:expo-file-system=./scripts/stubs/expo-file-system.ts --alias:expo-asset=./scripts/stubs/expo-asset.ts && node node_modules/.cache/pruebas/probar-plantillas.js"
   },
   "private": true
 }

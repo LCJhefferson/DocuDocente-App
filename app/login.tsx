@@ -39,17 +39,14 @@ export default function LoginScreen() {
         correoElectronico: usuario.trim(),
         contrasena: contrasena.trim(),
       });
-    } catch (error) {
+    } catch (error: any) {
       setProcesando(false);
-      Alert.alert(
-        'Error de Autenticación',
-        'Credenciales incorrectas o problemas al conectar con la base de datos local.'
-      );
+      Alert.alert('Error de Autenticación', error?.message || 'No se pudo iniciar sesión.');
     }
   };
 
   const handleOlvideContrasena = () => {
-    Alert.alert('Recuperación', 'Póngase en contacto con el administrador del sistema.');
+    router.push('/recuperar');
   };
 
   const handleCrearCuenta = () => {

@@ -1,6 +1,7 @@
+import { RequisitosContrasena } from '../src/components/cuenta/RequisitosContrasena';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,13 +16,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AuthService } from '../src/services/authService';
-import { esCorreoValido, validarContrasena } from '../src/utils/validaciones';
+import { useAuth } from '../src/context/AuthContext';
+import { esCorreoValido, validarContrasena, validarNombre, validarPerfil } from '../src/utils/validaciones';
 
 export default function RegistroScreen() {
   const router = useRouter();
+  const { registrarse } = useAuth();
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [cargando, setCargando] = useState(false);
+  const enCurso = useRef(false);
 
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [gradoAcademico, setGradoAcademico] = useState('');
@@ -49,14 +52,17 @@ export default function RegistroScreen() {
   };
 
   const manejarAvanzarPaso1 = () => {
-    if (!nombreCompleto.trim()) {
-      Alert.alert('Campo Obligatorio', 'Por favor ingresa tu Nombre completo.');
+    const problema = validarNombre(nombreCompleto);
+    if (problema) {
+      Alert.alert('Revisa tus datos', problema);
       return;
     }
     setPaso(2);
   };
 
   const manejarAvanzarPaso2 = () => {
+    const problema = validarPerfil({ nombreCompleto, gradoAcademico, facultad, departamento, codigoInstitucional });
+    if (problema) { Alert.alert('Revisa tus datos', problema); return; }
     setPaso(3);
   };
 
@@ -67,17 +73,18 @@ export default function RegistroScreen() {
   };
 
   const manejarRegistroFinal = async () => {
+    if (enCurso.current) return;
     if (!correoElectronico.trim() || !contrasena.trim() || !confirmarContrasena.trim()) {
       Alert.alert('Atención', 'Por favor completa todos los campos obligatorios.');
       return;
     }
 
     if (!esCorreoValido(correoElectronico)) {
-      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@untrm.edu.pe.');
+      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@gmail.com. También puedes usar Outlook u otro proveedor.');
       return;
     }
 
-    const problemaContrasena = validarContrasena(contrasena.trim());
+    const problemaContrasena = validarContrasena(contrasena);
     if (problemaContrasena) {
       Alert.alert('Contraseña débil', problemaContrasena);
       return;
@@ -88,22 +95,24 @@ export default function RegistroScreen() {
       return;
     }
 
+    enCurso.current = true;
     setCargando(true);
     try {
-      await AuthService.registrarse({
+      await registrarse({
         nombreCompleto: nombreCompleto.trim(),
         gradoAcademico: gradoAcademico.trim(),
         facultad: facultad.trim(),
         departamento: departamento.trim(),
         codigoInstitucional: codigoInstitucional.trim(),
         correoElectronico: correoElectronico.trim(),
-        contrasena: contrasena.trim(),
+        contrasena,
       });
 
       router.replace('/(tabs)');
     } catch (error: any) {
       Alert.alert('Error de Registro', error.message || 'No se pudo crear la cuenta.');
     } finally {
+      enCurso.current = false;
       setCargando(false);
     }
   };
@@ -145,6 +154,7 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={nombreCompleto}
+                  maxLength={120}
                   onChangeText={setNombreCompleto}
                   placeholder=""
                 />
@@ -155,6 +165,7 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={gradoAcademico}
+                  maxLength={40}
                   onChangeText={setGradoAcademico}
                   placeholder=""
                 />
@@ -178,6 +189,7 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={facultad}
+                  maxLength={200}
                   onChangeText={setFacultad}
                   placeholder=""
                 />
@@ -188,6 +200,7 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={departamento}
+                  maxLength={200}
                   onChangeText={setDepartamento}
                   placeholder=""
                 />
@@ -198,6 +211,7 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={codigoInstitucional}
+                  maxLength={30}
                   onChangeText={setCodigoInstitucional}
                   placeholder=""
                 />
@@ -221,10 +235,13 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={correoElectronico}
+                  autoCorrect={false}
+                  accessibilityHint="Se acepta cualquier proveedor de correo electrónico."
+                  maxLength={254}
                   onChangeText={setCorreoElectronico}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  placeholder=""
+                  placeholder="nombre@gmail.com"
                 />
               </View>
 
@@ -234,6 +251,9 @@ export default function RegistroScreen() {
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
                     value={contrasena}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={128}
                     onChangeText={setContrasena}
                     secureTextEntry={!mostrarContrasena}
                     placeholder=""
@@ -252,12 +272,17 @@ export default function RegistroScreen() {
                 </View>
               </View>
 
-              <View style={styles.grupoInput}>
-                <Text style={styles.label}>Confirmar contraseña</Text>
+              <RequisitosContrasena valor={contrasena} />
+
+              <View style={[styles.grupoInput, { marginTop: 20 }]}>
+                <Text style={styles.label}>{confirmarContrasena ? (confirmarContrasena === contrasena ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden') : 'Confirmar contraseña'}</Text>
                 <View style={styles.contenedorPassword}>
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
                     value={confirmarContrasena}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={128}
                     onChangeText={setConfirmarContrasena}
                     secureTextEntry={!mostrarConfirmarContrasena}
                     placeholder=""
@@ -277,9 +302,10 @@ export default function RegistroScreen() {
               </View>
 
               <TouchableOpacity
-                style={styles.botonPrincipal}
+                style={[styles.botonPrincipal, (cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena) && { opacity: 0.5 }]}
                 onPress={manejarRegistroFinal}
-                disabled={cargando}
+                disabled={cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena}
+                accessibilityState={{ disabled: cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena }}
                 activeOpacity={0.85}
               >
                 {cargando ? (

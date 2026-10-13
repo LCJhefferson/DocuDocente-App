@@ -8,7 +8,7 @@ import { db } from '../database/client';
 import { cuentasAutenticacion } from '../database/schema';
 import { CredencialesLogin, EntradaRegistro } from '../models/Autenticacion';
 import { esHash, generarCodigo, hashContrasena } from '../utils/seguridad';
-import { esCorreoValido, validarContrasena } from '../utils/validaciones';
+import { esCorreoValido, validarContrasena, validarPerfil, exigir } from '../utils/validaciones';
 import { enviarCodigoRecuperacion } from './correoService';
 import { PerfilDocenteService } from './perfilDocenteService';
 
@@ -21,6 +21,9 @@ const MINUTO_MS = 60_000;
 
 // ponytail: se guardan en memoria; si la app se cierra, se reinician. Pasar a SQLite si hace falta que persistan.
 const intentosFallidos = new Map<string, { fallos: number; bloqueadoHasta: number }>();
+const enviosEnCurso = new Set<string>();
+const cambiosEnCurso = new Set<string>();
+const ultimoEnvio = new Map<string, number>();
 const codigosRecuperacion = new Map<string, { codigoHash: string; expiraEn: number; intentos: number }>();
 
 const normalizar = (correo: string) => correo.trim().toLowerCase();
@@ -32,7 +35,7 @@ const buscarCuenta = async (correo: string) => {
 
 export class AuthService {
   /**
-   * Proceso de Alta: Registra la cuenta y crea de manera atómica su perfil docente
+   * Proceso de alta: valida y registra la cuenta con su perfil docente
    */
   static async registrarse(entrada: EntradaRegistro): Promise<string> {
     const correoFormateado = normalizar(entrada.correoElectronico);
@@ -40,6 +43,7 @@ export class AuthService {
     if (!esCorreoValido(correoFormateado)) {
       throw new Error('El correo electrónico no tiene un formato válido.');
     }
+    exigir(validarPerfil(entrada));
     const problema = validarContrasena(entrada.contrasena);
     if (problema) throw new Error(problema);
 
@@ -60,15 +64,20 @@ export class AuthService {
       actualizadoEn: ahora,
     });
 
-    // 2. Insertar perfil docente asociado
-    await PerfilDocenteService.crearPerfil({
-      cuentaId: cuentaId,
-      nombreCompleto: entrada.nombreCompleto,
-      gradoAcademico: entrada.gradoAcademico,
-      facultad: entrada.facultad,
-      departamento: entrada.departamento,
-      codigoInstitucional: entrada.codigoInstitucional,
-    });
+    // Si falla el perfil, se retira solo la cuenta recién creada para permitir reintentar.
+    try {
+      await PerfilDocenteService.crearPerfil({
+        cuentaId: cuentaId,
+        nombreCompleto: entrada.nombreCompleto.trim(),
+        gradoAcademico: entrada.gradoAcademico.trim(),
+        facultad: entrada.facultad.trim(),
+        departamento: entrada.departamento?.trim(),
+        codigoInstitucional: entrada.codigoInstitucional?.trim(),
+      });
+    } catch (error) {
+      await db.delete(cuentasAutenticacion).where(eq(cuentasAutenticacion.id, cuentaId));
+      throw error;
+    }
 
     // 3. Establecer sesión
     await this.guardarSesionLocal(cuentaId);
@@ -139,28 +148,33 @@ export class AuthService {
     if (!esCorreoValido(correoFormateado)) {
       throw new Error('El correo electrónico no tiene un formato válido.');
     }
-    if (!(await buscarCuenta(correoFormateado))) {
-      throw new Error('El correo no está registrado.');
+    const cuenta = await buscarCuenta(correoFormateado);
+    if (!cuenta || !cuenta.esActivo) throw new Error('El correo no está registrado o la cuenta está desactivada.');
+    if (enviosEnCurso.has(correoFormateado) || Date.now() - (ultimoEnvio.get(correoFormateado) ?? 0) < MINUTO_MS) {
+      throw new Error('Espera un minuto antes de solicitar otro código.');
     }
 
-    const codigo = generarCodigo();
-    await enviarCodigoRecuperacion(correoFormateado, codigo, MINUTOS_CODIGO);
-
-    codigosRecuperacion.set(correoFormateado, {
-      codigoHash: await hashContrasena(correoFormateado, codigo),
-      expiraEn: Date.now() + MINUTOS_CODIGO * MINUTO_MS,
-      intentos: 0,
-    });
+    enviosEnCurso.add(correoFormateado);
+    try {
+      const codigo = generarCodigo();
+      const codigoHash = await hashContrasena(correoFormateado, codigo);
+      await enviarCodigoRecuperacion(correoFormateado, codigo, MINUTOS_CODIGO);
+      codigosRecuperacion.set(correoFormateado, { codigoHash, expiraEn: Date.now() + MINUTOS_CODIGO * MINUTO_MS, intentos: 0 });
+      ultimoEnvio.set(correoFormateado, Date.now());
+    } finally {
+      enviosEnCurso.delete(correoFormateado);
+    }
   }
 
   /**
-   * Recuperación, paso 2: verifica el código y guarda la nueva contraseña
+   * Comprueba el código sin consumirlo; el guardado vuelve a comprobarlo
    */
-  static async restablecerContrasena(correo: string, codigo: string, nuevaContrasena: string): Promise<void> {
+  static async verificarCodigoRecuperacion(correo: string, codigo: string): Promise<number> {
     const correoFormateado = normalizar(correo);
+    if (!esCorreoValido(correoFormateado)) throw new Error('Ingresa un correo válido.');
+    if (!/^\d{6}$/.test(codigo.trim())) throw new Error('El código debe tener exactamente 6 dígitos.');
     const pendiente = codigosRecuperacion.get(correoFormateado);
-
-    if (!pendiente || pendiente.expiraEn < Date.now()) {
+    if (!pendiente || pendiente.expiraEn <= Date.now()) {
       codigosRecuperacion.delete(correoFormateado);
       throw new Error('El código venció. Solicita uno nuevo.');
     }
@@ -168,24 +182,37 @@ export class AuthService {
       codigosRecuperacion.delete(correoFormateado);
       throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
     }
-    if (pendiente.codigoHash !== (await hashContrasena(correoFormateado, codigo.trim()))) {
+    const hash = await hashContrasena(correoFormateado, codigo.trim());
+    // Otro envío o validación puede haber cambiado el código mientras se calculaba el hash.
+    if (codigosRecuperacion.get(correoFormateado) !== pendiente || pendiente.expiraEn <= Date.now()) throw new Error('El código cambió o venció. Solicita uno nuevo.');
+    if (pendiente.intentos >= MAX_INTENTOS) throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
+    if (pendiente.codigoHash !== hash) {
       pendiente.intentos += 1;
       throw new Error('El código no es correcto.');
     }
+    return pendiente.expiraEn;
+  }
 
-    const problema = validarContrasena(nuevaContrasena);
-    if (problema) throw new Error(problema);
-
-    await db
-      .update(cuentasAutenticacion)
-      .set({
-        contrasenaHash: await hashContrasena(correoFormateado, nuevaContrasena),
-        actualizadoEn: new Date().toISOString(),
-      })
-      .where(eq(cuentasAutenticacion.correoElectronico, correoFormateado));
-
-    codigosRecuperacion.delete(correoFormateado);
-    intentosFallidos.delete(correoFormateado);
+  static async restablecerContrasena(correo: string, codigo: string, nuevaContrasena: string): Promise<void> {
+    const correoFormateado = normalizar(correo);
+    exigir(validarContrasena(nuevaContrasena));
+    if (cambiosEnCurso.has(correoFormateado)) throw new Error('Ya se está cambiando la contraseña. Espera un momento.');
+    cambiosEnCurso.add(correoFormateado);
+    try {
+      await this.verificarCodigoRecuperacion(correoFormateado, codigo);
+      const cuenta = await buscarCuenta(correoFormateado);
+      if (!cuenta?.esActivo) throw new Error('La cuenta no existe o está desactivada.');
+      const nuevaHash = await hashContrasena(correoFormateado, nuevaContrasena);
+      // Se comprueba otra vez si hubo un reenvío durante la consulta de cuenta.
+      await this.verificarCodigoRecuperacion(correoFormateado, codigo);
+      await db.update(cuentasAutenticacion)
+        .set({ contrasenaHash: nuevaHash, actualizadoEn: new Date().toISOString() })
+        .where(eq(cuentasAutenticacion.id, cuenta.id));
+      codigosRecuperacion.delete(correoFormateado);
+      intentosFallidos.delete(correoFormateado);
+    } finally {
+      cambiosEnCurso.delete(correoFormateado);
+    }
   }
 
   static async guardarSesionLocal(cuentaId: string): Promise<void> {

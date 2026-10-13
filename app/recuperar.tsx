@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../src/services/authService';
-import { MIN_LARGO_CONTRASENA } from '../src/utils/validaciones';
+import { MIN_LARGO_CONTRASENA, validarContrasena } from '../src/utils/validaciones';
 
 type Paso = 'correo' | 'codigo';
 
@@ -28,14 +28,18 @@ export default function RecuperarScreen() {
   const [confirmar, setConfirmar] = useState('');
   const [mostrar, setMostrar] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  const enCurso = useRef(false);
 
   const ejecutar = async (accion: () => Promise<void>) => {
+    if (enCurso.current) return;
+    enCurso.current = true;
     setProcesando(true);
     try {
       await accion();
     } catch (error: any) {
       Alert.alert('No se pudo completar', error?.message || 'Inténtalo de nuevo.');
     } finally {
+      enCurso.current = false;
       setProcesando(false);
     }
   };
@@ -43,13 +47,16 @@ export default function RecuperarScreen() {
   const enviarCodigo = () =>
     ejecutar(async () => {
       await AuthService.solicitarRecuperacion(correo);
+      setCodigo('');
       setPaso('codigo');
       Alert.alert('Código enviado', `Revisa tu bandeja de entrada (y spam) en ${correo.trim()}.`);
     });
 
   const cambiarContrasena = () =>
     ejecutar(async () => {
-      if (codigo.trim().length !== 6) throw new Error('El código tiene 6 dígitos.');
+      if (!/^\d{6}$/.test(codigo.trim())) throw new Error('El código tiene 6 dígitos.');
+      const problema = validarContrasena(nueva);
+      if (problema) throw new Error(problema);
       if (nueva !== confirmar) throw new Error('Las contraseñas no coinciden.');
       await AuthService.restablecerContrasena(correo, codigo, nueva);
       Alert.alert('Contraseña actualizada', 'Ya puedes iniciar sesión con tu nueva contraseña.', [
@@ -78,6 +85,7 @@ export default function RecuperarScreen() {
               <TextInput
                 style={styles.input}
                 value={correo}
+                maxLength={254}
                 onChangeText={setCorreo}
                 placeholder="nombre@untrm.edu.pe"
                 placeholderTextColor="#A8B9C2"
@@ -106,6 +114,8 @@ export default function RecuperarScreen() {
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
                     value={nueva}
+                    autoCorrect={false}
+                    maxLength={128}
                     onChangeText={setNueva}
                     secureTextEntry={!mostrar}
                     autoCapitalize="none"
@@ -114,13 +124,15 @@ export default function RecuperarScreen() {
                     <Ionicons name={mostrar ? 'eye-off-outline' : 'eye-outline'} size={20} color="#83968C" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.ayuda}>Mínimo {MIN_LARGO_CONTRASENA} caracteres, con letras y números.</Text>
+                <Text style={styles.ayuda}>{nueva ? (validarContrasena(nueva) ?? 'Contraseña válida') : `Mínimo ${MIN_LARGO_CONTRASENA} caracteres, con letras y números, sin espacios.`}</Text>
               </View>
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>Confirmar contraseña</Text>
+                <Text style={styles.label}>{confirmar ? (confirmar === nueva ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden') : 'Confirmar contraseña'}</Text>
                 <TextInput
                   style={styles.input}
                   value={confirmar}
+                  autoCorrect={false}
+                  maxLength={128}
                   onChangeText={setConfirmar}
                   secureTextEntry={!mostrar}
                   autoCapitalize="none"

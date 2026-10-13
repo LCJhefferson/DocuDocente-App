@@ -167,41 +167,47 @@ export class AuthService {
   }
 
   /**
-   * Recuperación, paso 2: verifica el código y guarda la nueva contraseña
+   * Comprueba el código sin consumirlo; el guardado vuelve a comprobarlo
    */
-  static async restablecerContrasena(correo: string, codigo: string, nuevaContrasena: string): Promise<void> {
+  static async verificarCodigoRecuperacion(correo: string, codigo: string): Promise<number> {
     const correoFormateado = normalizar(correo);
     if (!esCorreoValido(correoFormateado)) throw new Error('Ingresa un correo válido.');
     if (!/^\d{6}$/.test(codigo.trim())) throw new Error('El código debe tener exactamente 6 dígitos.');
+    const pendiente = codigosRecuperacion.get(correoFormateado);
+    if (!pendiente || pendiente.expiraEn <= Date.now()) {
+      codigosRecuperacion.delete(correoFormateado);
+      throw new Error('El código venció. Solicita uno nuevo.');
+    }
+    if (pendiente.intentos >= MAX_INTENTOS) {
+      codigosRecuperacion.delete(correoFormateado);
+      throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
+    }
+    const hash = await hashContrasena(correoFormateado, codigo.trim());
+    // Otro envío o validación puede haber cambiado el código mientras se calculaba el hash.
+    if (codigosRecuperacion.get(correoFormateado) !== pendiente || pendiente.expiraEn <= Date.now()) throw new Error('El código cambió o venció. Solicita uno nuevo.');
+    if (pendiente.intentos >= MAX_INTENTOS) throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
+    if (pendiente.codigoHash !== hash) {
+      pendiente.intentos += 1;
+      throw new Error('El código no es correcto.');
+    }
+    return pendiente.expiraEn;
+  }
+
+  static async restablecerContrasena(correo: string, codigo: string, nuevaContrasena: string): Promise<void> {
+    const correoFormateado = normalizar(correo);
     exigir(validarContrasena(nuevaContrasena));
-    const cuenta = await buscarCuenta(correoFormateado);
-    if (!cuenta?.esActivo) throw new Error('La cuenta no existe o está desactivada.');
     if (cambiosEnCurso.has(correoFormateado)) throw new Error('Ya se está cambiando la contraseña. Espera un momento.');
     cambiosEnCurso.add(correoFormateado);
     try {
-      const pendiente = codigosRecuperacion.get(correoFormateado);
-
-      if (!pendiente || pendiente.expiraEn <= Date.now()) {
-        codigosRecuperacion.delete(correoFormateado);
-        throw new Error('El código venció. Solicita uno nuevo.');
-      }
-      if (pendiente.intentos >= MAX_INTENTOS) {
-        codigosRecuperacion.delete(correoFormateado);
-        throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
-      }
-      if (pendiente.codigoHash !== (await hashContrasena(correoFormateado, codigo.trim()))) {
-        pendiente.intentos += 1;
-        throw new Error('El código no es correcto.');
-      }
-
-      await db
-        .update(cuentasAutenticacion)
-        .set({
-          contrasenaHash: await hashContrasena(correoFormateado, nuevaContrasena),
-          actualizadoEn: new Date().toISOString(),
-        })
-        .where(eq(cuentasAutenticacion.correoElectronico, correoFormateado));
-
+      await this.verificarCodigoRecuperacion(correoFormateado, codigo);
+      const cuenta = await buscarCuenta(correoFormateado);
+      if (!cuenta?.esActivo) throw new Error('La cuenta no existe o está desactivada.');
+      const nuevaHash = await hashContrasena(correoFormateado, nuevaContrasena);
+      // Se comprueba otra vez si hubo un reenvío durante la consulta de cuenta.
+      await this.verificarCodigoRecuperacion(correoFormateado, codigo);
+      await db.update(cuentasAutenticacion)
+        .set({ contrasenaHash: nuevaHash, actualizadoEn: new Date().toISOString() })
+        .where(eq(cuentasAutenticacion.id, cuenta.id));
       codigosRecuperacion.delete(correoFormateado);
       intentosFallidos.delete(correoFormateado);
     } finally {

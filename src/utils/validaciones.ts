@@ -7,11 +7,20 @@ export const esCorreoValido = (correo: string): boolean => {
   return valor.length <= 254 && /^[^\s@.]+(?:\.[^\s@.]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/.test(valor);
 };
 
+export const requisitosContrasena = (valor: string) => [
+  { texto: 'Al menos 8 caracteres', cumple: valor.length >= MIN_LARGO_CONTRASENA },
+  { texto: 'Una letra minúscula', cumple: /\p{Ll}/u.test(valor) },
+  { texto: 'Una letra mayúscula', cumple: /\p{Lu}/u.test(valor) },
+  { texto: 'Un número', cumple: /\d/.test(valor) },
+  { texto: 'Sin espacios', cumple: valor.length > 0 && !/\s/.test(valor) },
+];
+
 export const validarContrasena = (valor: string): string | null => {
   if (valor.length < MIN_LARGO_CONTRASENA) return 'La contraseña debe tener al menos 8 caracteres.';
   if (valor.length > MAX_LARGO_CONTRASENA) return 'La contraseña no puede superar 128 caracteres.';
   if (/\s/.test(valor)) return 'La contraseña no debe contener espacios.';
-  if (!/\p{L}/u.test(valor) || !/\d/.test(valor)) return 'La contraseña debe tener letras y números.';
+  const falta = requisitosContrasena(valor).find(r => !r.cumple);
+  if (falta) return `La contraseña debe incluir: ${falta.texto.toLowerCase()}.`;
   return null;
 };
 

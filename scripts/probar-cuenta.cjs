@@ -49,7 +49,7 @@ prueba('correo válido, normalización y dominios inválidos', () => {
 prueba('contraseña: longitud, letras, números y espacios', () => {
   assert.equal(v.validarContrasena('Abcdef12'),null);
   assert.equal(v.validarContrasena('Contraseña12!'),null);
-  for (const x of ['', 'Abcd123', '12345678', 'abcdefgh', ' Clave123', 'Clave 123', 'Clave123 ', 'a'.repeat(128)+'1']) assert.ok(v.validarContrasena(x));
+  for (const x of ['', 'Abcd123', '12345678', 'abcdefgh', 'abcdefgh1', 'ABCDEFGH1', ' Clave123', 'Clave 123', 'Clave123 ', 'a'.repeat(128)+'1']) assert.ok(v.validarContrasena(x));
 });
 prueba('nombres con tildes, apóstrofos y guiones; rechaza números y controles', () => {
   assert.equal(v.validarNombre(datos.nombreCompleto),null);
@@ -148,5 +148,45 @@ prueba('EmailJS informa límite de envíos, error HTTP y falta de conexión', as
     global.fetch=async()=>{throw new TypeError('Network request failed');}; await assert.rejects(enviar('a@b.com','123456',10),/conexión/);
     global.fetch=async()=>{const e=new Error('abort');e.name='AbortError';throw e;}; await assert.rejects(enviar('a@b.com','123456',10),/tardó/);
   } finally {global.fetch=original;}
+});
+prueba('acepta correo personal y empresarial, sin exigir UNTRM', () => {
+  for (const correo of ['persona@gmail.com','persona@outlook.com','persona@yahoo.es','persona@miempresa.pe','persona@untrm.edu.pe']) assert.ok(v.esCorreoValido(correo),correo);
+});
+prueba('lista visual y validación usan las mismas reglas', () => {
+  for (const clave of ['', 'Abcd123', 'abcdefgh1', 'ABCDEFGH1', 'Abcdefgh', 'Clave 123', 'Árbol1234', 'Abcdef12']) {
+    assert.equal(v.requisitosContrasena(clave).every(r=>r.cumple), v.validarContrasena(clave) === null, clave);
+  }
+});
+prueba('verificar código devuelve vencimiento sin cambiar contraseña ni consumirlo', async () => {
+  const e=entorno(); await e.auth.registrarse(datos); await e.auth.solicitarRecuperacion('docente@ejemplo.com');
+  const hash=e.cuentas[0].contrasenaHash;
+  const vencimiento=await e.auth.verificarCodigoRecuperacion('docente@ejemplo.com','123456');
+  assert.ok(vencimiento>Date.now()); assert.equal(e.cuentas[0].contrasenaHash,hash);
+  await e.auth.restablecerContrasena('docente@ejemplo.com','123456','NuevaClave123');
+  await assert.rejects(e.auth.verificarCodigoRecuperacion('docente@ejemplo.com','123456'),/venció/);
+});
+prueba('verificación visual incorrecta comparte el límite de intentos con el guardado', async () => {
+  const e=entorno(); await e.auth.registrarse(datos); await e.auth.solicitarRecuperacion('docente@ejemplo.com');
+  for(let i=0;i<5;i++) await assert.rejects(e.auth.verificarCodigoRecuperacion('docente@ejemplo.com','999999'),/correcto/);
+  await assert.rejects(e.auth.restablecerContrasena('docente@ejemplo.com','123456','NuevaClave123'),/intentos/);
+});
+prueba('verificación rechaza el código anterior después de un reenvío', async () => {
+  const e=entorno(); const original=Date.now; let reloj=original(); Date.now=()=>reloj;
+  try {
+    await e.auth.registrarse(datos); await e.auth.solicitarRecuperacion('docente@ejemplo.com');
+    reloj+=60000; e.setCodigo('654321');
+    await e.auth.solicitarRecuperacion('docente@ejemplo.com');
+    await assert.rejects(e.auth.verificarCodigoRecuperacion('docente@ejemplo.com','123456'),/correcto/);
+    await e.auth.verificarCodigoRecuperacion('docente@ejemplo.com','654321');
+  } finally {Date.now=original;}
+});
+prueba('EmailJS explica bloqueo móvil y destinatario sin exponer datos sensibles', () => {
+  const {mensajeErrorEmailJS: mensaje}=cargar('src/services/correoService.ts');
+  assert.match(mensaje(403,'API calls are disabled for non-browser applications'),/Account > Security/);
+  assert.match(mensaje(422,'The recipients address is empty'),/\{\{to_email\}\}/);
+  assert.match(mensaje(400,'Template ID not found'),/Template ID/);
+  assert.match(mensaje(400,'Service ID not found'),/Service ID/);
+  assert.match(mensaje(412,'Gmail authentication failed'),/reconecta/);
+  assert.ok(!mensaje(500,'secret-person@example.com codigo 123456').includes('123456'));
 });
 (async()=>{ let fallos=0; for(const [nombre, fn] of pruebas){try{await fn(); console.log('OK '+nombre);}catch(e){fallos++;console.error('FALLO '+nombre,e);}} console.log(`${pruebas.length-fallos}/${pruebas.length} pruebas correctas`);process.exitCode=fallos?1:0;})();

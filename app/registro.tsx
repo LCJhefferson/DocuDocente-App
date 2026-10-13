@@ -1,3 +1,4 @@
+import { RequisitosContrasena } from '../src/components/cuenta/RequisitosContrasena';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -79,7 +80,7 @@ export default function RegistroScreen() {
     }
 
     if (!esCorreoValido(correoElectronico)) {
-      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@untrm.edu.pe.');
+      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@gmail.com. También puedes usar Outlook u otro proveedor.');
       return;
     }
 
@@ -234,16 +235,18 @@ export default function RegistroScreen() {
                 <TextInput
                   style={styles.input}
                   value={correoElectronico}
+                  autoCorrect={false}
+                  accessibilityHint="Se acepta cualquier proveedor de correo electrónico."
                   maxLength={254}
                   onChangeText={setCorreoElectronico}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  placeholder=""
+                  placeholder="nombre@gmail.com"
                 />
               </View>
 
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>{contrasena ? `Contraseña: ${validarContrasena(contrasena) ?? 'válida'}` : 'Contraseña (mínimo 8, letras y números)'}</Text>
+                <Text style={styles.label}>Contraseña</Text>
                 <View style={styles.contenedorPassword}>
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
@@ -269,7 +272,9 @@ export default function RegistroScreen() {
                 </View>
               </View>
 
-              <View style={styles.grupoInput}>
+              <RequisitosContrasena valor={contrasena} />
+
+              <View style={[styles.grupoInput, { marginTop: 20 }]}>
                 <Text style={styles.label}>{confirmarContrasena ? (confirmarContrasena === contrasena ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden') : 'Confirmar contraseña'}</Text>
                 <View style={styles.contenedorPassword}>
                   <TextInput
@@ -297,9 +302,10 @@ export default function RegistroScreen() {
               </View>
 
               <TouchableOpacity
-                style={styles.botonPrincipal}
+                style={[styles.botonPrincipal, (cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena) && { opacity: 0.5 }]}
                 onPress={manejarRegistroFinal}
-                disabled={cargando}
+                disabled={cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena}
+                accessibilityState={{ disabled: cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena }}
                 activeOpacity={0.85}
               >
                 {cargando ? (

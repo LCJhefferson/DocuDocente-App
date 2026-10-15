@@ -10,7 +10,7 @@ import { EntradaPerfilDocente, PerfilDocente } from '../models/PerfilDocente';
 
 export class PerfilDocenteService {
   /**
-   * Crea la ficha académica del docente enlazada a la cuenta de autenticación
+   * Crea la ficha académica del docente asignando valores institucionales por defecto
    */
   static async crearPerfil(entrada: EntradaPerfilDocente): Promise<PerfilDocente> {
     const perfilId = uuidv4();
@@ -21,9 +21,9 @@ export class PerfilDocenteService {
       cuentaId: entrada.cuentaId,
       nombreCompleto: entrada.nombreCompleto,
       gradoAcademico: entrada.gradoAcademico || 'Mg.',
-      facultad: entrada.facultad,
-      departamento: entrada.departamento || '',
-      codigoInstitucional: entrada.codigoInstitucional || '',
+      facultad: 'Facultad de Ingeniería de Sistemas y Mecánica Eléctrica', // <-- Satisface la restricción NOT NULL de la BD existente
+      departamento: '',
+      codigoInstitucional: '',
       creadoEn: ahora,
       actualizadoEn: ahora,
     });
@@ -33,9 +33,6 @@ export class PerfilDocenteService {
       cuentaId: entrada.cuentaId,
       nombreCompleto: entrada.nombreCompleto,
       gradoAcademico: entrada.gradoAcademico || 'Mg.',
-      facultad: entrada.facultad,
-      departamento: entrada.departamento,
-      codigoInstitucional: entrada.codigoInstitucional,
     };
   }
 
@@ -56,17 +53,11 @@ export class PerfilDocenteService {
       cuentaId: perfil.cuentaId,
       nombreCompleto: perfil.nombreCompleto,
       gradoAcademico: perfil.gradoAcademico,
-      facultad: perfil.facultad,
-      departamento: perfil.departamento ?? undefined,
-      codigoInstitucional: perfil.codigoInstitucional ?? undefined,
-      avatarUri: perfil.avatarUri ?? undefined,
     };
   }
 
   /**
    * Actualiza la información del perfil docente ligado a una cuenta
-   * @param cuentaId ID único de la cuenta de autenticación activa
-   * @param datos Campos parciales a actualizar en el perfil
    */
   static async actualizarPerfil(
     cuentaId: string,
@@ -74,7 +65,6 @@ export class PerfilDocenteService {
   ): Promise<void> {
     const ahora = new Date().toISOString();
 
-    // Actualizamos en la tabla perfiles_docente usando el filtro WHERE por cuenta_id
     await db
       .update(perfilesDocente)
       .set({

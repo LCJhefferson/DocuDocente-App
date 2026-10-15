@@ -68,6 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPerfilDocente(null);
   };
 
+
+
+
+
   return (
     <AuthContext.Provider
       value={{

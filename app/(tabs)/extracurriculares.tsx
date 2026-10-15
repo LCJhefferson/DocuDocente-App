@@ -165,7 +165,7 @@ export default function ExtracurricularesScreen() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         titulo={`Actividad Extracurricular - ${unidadActiva}`}
-        subtitles="Registra actividades que no son clases"
+        subtitulo="Registra actividades que no son clases"
         tipos={['Charla', 'Campaña', 'Salida', 'Otro']}
         onGuardar={manejarGuardar}
       />

@@ -19,14 +19,11 @@ export const perfilesDocente = sqliteTable('perfiles_docente', {
     .notNull()
     .unique(),
   nombreCompleto: text('nombre_completo').notNull(),
-  gradoAcademico: text('grado_academico').default('Mg.').notNull(),
-  facultad: text('facultad').notNull(),
-  departamento: text('departamento'),
-  codigoInstitucional: text('codigo_institucional'),
-  avatarUri: text('avatar_uri'),
+  gradoAcademico: text('grado_academico').default('Mg.').notNull(), // SE CONSERVA
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
 });
+
 
 // 3. PLANTILLAS DE ENCABEZADO
 export const plantillas = sqliteTable('plantillas', {

@@ -6,11 +6,15 @@ import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvide
 import { useAuth } from '../../src/context/AuthContext';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
+const UNIDADES = ['Unidad 1', 'Unidad 2', 'Unidad 3'];
+
 export default function ExtracurricularesScreen() {
   const { perfilDocente, cerrarSesion } = useAuth();
   const [actividades, setActividades] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState('');
+  const [unidadActiva, setUnidadActiva] = useState<string>('Unidad 1');
   const [modalVisible, setModalVisible] = useState(false);
+
   const cargarActividades = async () => {
     const resultado = await evidenciaService.obtenerExtracurriculares();
     setActividades(resultado);
@@ -31,12 +35,13 @@ export default function ExtracurricularesScreen() {
         tipoGeneral: 'EXTRACURRICULAR',
         nombreActividad: datos.nombreActividad,
         descripcion: datos.descripcion,
+        unidad: unidadActiva, // <-- Asigna la unidad actualmente seleccionada
         tipoActividad: datos.tipoActividad,
         rutaArchivoLocal: datos.archivo?.uri,
         tipoArchivo: datos.archivo?.type === 'application/pdf' ? 'PDF' : 'IMAGE',
       });
       cargarActividades();
-       } catch (error) {
+    } catch (error) {
       Alert.alert('Error', 'No se pudo guardar la actividad.');
     }
   };
@@ -47,7 +52,8 @@ export default function ExtracurricularesScreen() {
       { text: 'Salir', style: 'destructive', onPress: () => cerrarSesion() },
     ]);
   };
-    const manejarEliminar = (actividad: any) => {
+
+  const manejarEliminar = (actividad: any) => {
     Alert.alert('Eliminar actividad', `¿Eliminar "${actividad.nombreActividad}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -64,13 +70,19 @@ export default function ExtracurricularesScreen() {
       },
     ]);
   };
-    const actividadesFiltradas = actividades.filter((a) =>
-    a.nombreActividad.toLowerCase().includes(busqueda.toLowerCase())
-  );
+
+  // Filtrado por Búsqueda y por Unidad Seleccionada
+  const actividadesFiltradas = actividades.filter((a) => {
+    const coincideBusqueda = a.nombreActividad?.toLowerCase().includes(busqueda.toLowerCase());
+    // Si la actividad no tiene unidad registrada (datos antiguos), se muestra en Unidad 1 por defecto
+    const coincideUnidad = a.unidad ? a.unidad === unidadActiva : unidadActiva === 'Unidad 1';
+    return coincideBusqueda && coincideUnidad;
+  });
 
   return (
     <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-            <View style={styles.encabezado}>
+      {/* Encabezado */}
+      <View style={styles.encabezado}>
         <Text style={styles.titulo}>Extracurriculares</Text>
         <View style={styles.iconosEncabezado}>
           <TouchableOpacity
@@ -85,34 +97,61 @@ export default function ExtracurricularesScreen() {
           </TouchableOpacity>
         </View>
       </View>
-      
+
+      {/* Selector de Unidades (Chips) */}
+      <View style={styles.contenedorUnidades}>
+        {UNIDADES.map((unidad) => {
+          const esActiva = unidadActiva === unidad;
+          return (
+            <TouchableOpacity
+              key={unidad}
+              style={[styles.chipUnidad, esActiva && styles.chipUnidadActivo]}
+              onPress={() => setUnidadActiva(unidad)}
+            >
+              <Text style={[styles.textoChipUnidad, esActiva && styles.textoChipUnidadActivo]}>
+                {unidad}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Buscador */}
       <View style={styles.contenedorBuscador}>
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
         <TextInput
           style={styles.inputBuscador}
-          placeholder="Buscar en el historial"
+          placeholder="Buscar evidencia"
           placeholderTextColor="#94A3B8"
           value={busqueda}
           onChangeText={setBusqueda}
         />
       </View>
-        <View style={styles.contenedorBotonAgregar}>
+
+      {/* Botón Añadir Evidencia */}
+      <View style={styles.contenedorBotonAgregar}>
         <TouchableOpacity style={styles.botonAgregar} onPress={() => setModalVisible(true)}>
           <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
           <Text style={styles.textoBotonAgregar}>Añadir evidencia</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Lista de Evidencias de la Unidad */}
       <FlatList
         data={actividadesFiltradas}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.lista}
         ListEmptyComponent={
-          <Text style={styles.textoVacio}>No hay actividades extracurriculares registradas.</Text>
+          <View style={styles.contenedorVacio}>
+            <Ionicons name="folder-open-outline" size={56} color="#94A3B8" style={{ marginBottom: 12 }} />
+            <Text style={styles.textoVacio}>No hay evidencias registradas en esta unidad.</Text>
+          </View>
         }
         renderItem={({ item }) => (
-        <View style={styles.tarjeta}>
-          <View style={styles.info}>
-            <Text style={styles.nombre}>{item.nombreActividad}</Text>
+          <View style={styles.tarjeta}>
+            <View style={styles.info}>
+              <Text style={styles.nombre}>{item.nombreActividad}</Text>
+              {item.tipoActividad ? <Text style={styles.tipo}>{item.tipoActividad}</Text> : null}
               <Text style={styles.fecha}>{new Date(item.creadoEn).toLocaleDateString('es-ES')}</Text>
             </View>
             <TouchableOpacity style={styles.botonEliminar} onPress={() => manejarEliminar(item)}>
@@ -121,12 +160,12 @@ export default function ExtracurricularesScreen() {
           </View>
         )}
       />
-      
+
       <ModalSubirEvidencia
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        titulo="Actividades Extracurriculares"
-        subtitulo="Registra actividades que no son clases"
+        titulo={`Actividad Extracurricular - ${unidadActiva}`}
+        subtitles="Registra actividades que no son clases"
         tipos={['Charla', 'Campaña', 'Salida', 'Otro']}
         onGuardar={manejarGuardar}
       />
@@ -136,7 +175,7 @@ export default function ExtracurricularesScreen() {
 
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: '#FFFFFF' },
-    encabezado: {
+  encabezado: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -145,7 +184,33 @@ const styles = StyleSheet.create({
   },
   titulo: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
   iconosEncabezado: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-    contenedorBuscador: {
+
+  // Estilos del Selector de Unidades
+  contenedorUnidades: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 16,
+  },
+  chipUnidad: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+  },
+  chipUnidadActivo: {
+    backgroundColor: '#BAE6FD',
+  },
+  textoChipUnidad: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  textoChipUnidadActivo: {
+    color: '#0369A1',
+  },
+
+  contenedorBuscador: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
@@ -169,7 +234,7 @@ const styles = StyleSheet.create({
   },
   textoBotonAgregar: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   lista: { paddingHorizontal: 16 },
-    tarjeta: {
+  tarjeta: {
     backgroundColor: '#BAE6FD',
     borderRadius: 20,
     padding: 16,
@@ -180,6 +245,8 @@ const styles = StyleSheet.create({
   info: { flex: 1, marginRight: 12 },
   botonEliminar: { padding: 6, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.4)' },
   nombre: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+  tipo: { fontSize: 13, color: '#0369A1', fontWeight: '500', marginTop: 2 },
   fecha: { fontSize: 12, color: '#475569', marginTop: 4 },
-  textoVacio: { color: '#94A3B8', textAlign: 'center', marginTop: 40 },
+  contenedorVacio: { alignItems: 'center', justifyContent: 'center', marginTop: 60 },
+  textoVacio: { color: '#94A3B8', textAlign: 'center', fontSize: 14 },
 });

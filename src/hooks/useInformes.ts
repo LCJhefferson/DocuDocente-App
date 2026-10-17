@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { EntradaCrearInforme, EntradaResultadoUnidad, Informe, InformeCompleto } from '../models/Informe';
 import { InformeService } from '../services/informeService';
 import { compartirPdf, descargarPdfInforme, generarPdfInforme } from '../services/pdfService';
-
+import { compartirWord, generarWordInforme } from '../services/wordService';
 /**
  * Lógica del módulo de informes para las pantallas:
  * historial, crear, eliminar y exportar a PDF.
@@ -67,6 +67,10 @@ export const useInformes = () => {
 
   // Abre "Guardar como PDF" del sistema para descargarlo
   const descargarInforme = (informeId: string) => conInforme(informeId, descargarPdfInforme);
+  
+  // Genera el Word (.docx) y abre el menú para guardarlo o compartirlo
+  const descargarWordInforme = (informeId: string) =>
+    conInforme(informeId, async (datos) => compartirWord(await generarWordInforme(datos)));
 
   return {
     informes,
@@ -77,5 +81,7 @@ export const useInformes = () => {
     eliminarInforme,
     compartirInforme,
     descargarInforme,
+    descargarWordInforme,
   };
 };
+  

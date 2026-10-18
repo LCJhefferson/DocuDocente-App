@@ -18,7 +18,7 @@ export default function VistaPreviaInformeScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { perfilDocente } = useAuth();
-  const { descargarInforme, compartirInforme, eliminarInforme, generandoPdf } = useInformes();
+  const { descargarInforme, descargarWordInforme, compartirInforme, eliminarInforme, generandoPdf } = useInformes();
   const [datos, setDatos] = useState<InformeCompleto | null>(null);
   const [cargando, setCargando] = useState(true);
 
@@ -146,13 +146,26 @@ export default function VistaPreviaInformeScreen() {
         </View>
       </ScrollView>
 
-      {/* BOTONES */}
+            {/* BOTONES */}
       <View style={styles.pie}>
         <TouchableOpacity style={[styles.botonDescargar, generandoPdf && styles.deshabilitado]} onPress={() => ejecutar(descargarInforme)} disabled={generandoPdf}>
-          {generandoPdf ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.textoDescargar}>Descargar PDF</Text>}
+          {generandoPdf ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.textoDescargar} numberOfLines={1} adjustsFontSizeToFit>
+              Descargar PDF
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.botonDescargar, generandoPdf && styles.deshabilitado]} onPress={() => ejecutar(descargarWordInforme)} disabled={generandoPdf}>
+          <Text style={styles.textoDescargar} numberOfLines={1} adjustsFontSizeToFit>
+            Descargar Word
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.botonCompartir, generandoPdf && styles.deshabilitado]} onPress={() => ejecutar(compartirInforme)} disabled={generandoPdf}>
-          <Text style={styles.textoCompartir}>Compartir</Text>
+          <Text style={styles.textoCompartir} numberOfLines={1} adjustsFontSizeToFit>
+            Compartir
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

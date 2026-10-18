@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { comprimirImagen } from '../../utils/imagenes';
 
 interface ArchivoAdjunto {
   uri: string;
@@ -70,7 +71,7 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setArchivo({
-        uri: asset.uri,
+        uri: await comprimirImagen(asset.uri, asset.width),
         name: asset.fileName || `Evidencia_${Date.now()}.jpg`,
         type: 'image',
       });
@@ -86,14 +87,14 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.7,
     });
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setArchivo({
-        uri: asset.uri,
+        uri: await comprimirImagen(asset.uri, asset.width),
         name: asset.fileName || `Imagen_${Date.now()}.jpg`,
         type: 'image',
       });
@@ -109,9 +110,11 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
       });
 
       if (!result.canceled && result.assets[0]) {
-        const doc = result.assets[0];
+                const doc = result.assets[0];
+        // Solo las imágenes se reducen
+        const esImagen = doc.mimeType?.startsWith('image/');
         setArchivo({
-          uri: doc.uri,
+          uri: esImagen ? await comprimirImagen(doc.uri) : doc.uri,
           name: doc.name,
           type: doc.mimeType || 'file',
         });

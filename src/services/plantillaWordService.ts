@@ -1,24 +1,24 @@
 
 import {
-    AlignmentType,
-    BorderStyle,
-    Document,
-    Footer,
-    Header,
-    ImageRun,
-    LineRuleType,
-    PageNumber,
-    Paragraph,
-    ShadingType,
-    Tab,
-    Table,
-    TableCell,
-    TableLayoutType,
-    TableRow,
-    TabStopType,
-    TextRun,
-    VerticalAlign,
-    WidthType,
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Footer,
+  Header,
+  ImageRun,
+  LineRuleType,
+  PageNumber,
+  Paragraph,
+  ShadingType,
+  Tab,
+  Table,
+  TableCell,
+  TableLayoutType,
+  TableRow,
+  TabStopType,
+  TextRun,
+  VerticalAlign,
+  WidthType,
 } from 'docx';
 import { marcaSeccion } from '../data/catalogoPlantillas';
 import { Cabecera, ContenidoInforme, DefinicionPlantilla, Pie, Seccion } from '../models/Plantilla';
@@ -28,7 +28,7 @@ import { reemplazarMarcadores, unidadEnRomano } from '../utils/informeTexto';
 import { DatosCurso, DatosInforme } from './informeDatosService';
 
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
-
+const FACULTAD = 'Ingeniería de Sistemas y Mecánica Eléctrica';
 const DOCUMENTACION_POR_DEFECTO = [
   'Sílabos aprobados de los cursos asignados.',
   'Instrumentos de evaluación por criterios.',
@@ -318,7 +318,7 @@ export const construirDocumentoDesdePlantilla = async (
       case 'datos_generales':
         return [
           parrafo([{ t: 'Docente: ', b: true }, datos.valores.docente]),
-          parrafo([{ t: 'Facultad: ', b: true }, datos.docente.facultad]),
+          parrafo([{ t: 'Facultad: ', b: true }, FACULTAD]),
           parrafo([{ t: 'Semestre académico: ', b: true }, datos.valores.semestre]),
         ];
       case 'cursos':

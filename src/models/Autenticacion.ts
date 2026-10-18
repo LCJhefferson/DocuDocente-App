@@ -17,7 +17,4 @@ export interface EntradaRegistro {
   contrasena: string;
   nombreCompleto: string;
   gradoAcademico: string;
-  facultad: string;
-  departamento?: string;
-  codigoInstitucional?: string;
 }

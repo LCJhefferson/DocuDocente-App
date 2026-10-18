@@ -8,7 +8,7 @@ import { db } from '../database/client';
 import { cuentasAutenticacion } from '../database/schema';
 import { CredencialesLogin, EntradaRegistro } from '../models/Autenticacion';
 import { esHash, generarCodigo, hashContrasena } from '../utils/seguridad';
-import { esCorreoValido, validarContrasena, validarPerfil, exigir } from '../utils/validaciones';
+import { esCorreoValido, exigir, validarContrasena, validarNombre } from '../utils/validaciones';
 import { enviarCodigoRecuperacion } from './correoService';
 import { PerfilDocenteService } from './perfilDocenteService';
 
@@ -19,7 +19,6 @@ const MINUTOS_BLOQUEO = 5;
 const MINUTOS_CODIGO = 10;
 const MINUTO_MS = 60_000;
 
-// ponytail: se guardan en memoria; si la app se cierra, se reinician. Pasar a SQLite si hace falta que persistan.
 const intentosFallidos = new Map<string, { fallos: number; bloqueadoHasta: number }>();
 const enviosEnCurso = new Set<string>();
 const cambiosEnCurso = new Set<string>();
@@ -35,7 +34,7 @@ const buscarCuenta = async (correo: string) => {
 
 export class AuthService {
   /**
-   * Proceso de alta: valida y registra la cuenta con su perfil docente
+   * Proceso de alta: valida y registra la cuenta con su perfil docente simplificado
    */
   static async registrarse(entrada: EntradaRegistro): Promise<string> {
     const correoFormateado = normalizar(entrada.correoElectronico);
@@ -43,7 +42,9 @@ export class AuthService {
     if (!esCorreoValido(correoFormateado)) {
       throw new Error('El correo electrónico no tiene un formato válido.');
     }
-    exigir(validarPerfil(entrada));
+    
+    // Validación exclusiva del nombre completo
+    exigir(validarNombre(entrada.nombreCompleto));
     const problema = validarContrasena(entrada.contrasena);
     if (problema) throw new Error(problema);
 
@@ -64,15 +65,12 @@ export class AuthService {
       actualizadoEn: ahora,
     });
 
-    // Si falla el perfil, se retira solo la cuenta recién creada para permitir reintentar.
+    // 2. Crear perfil docente simplificado
     try {
       await PerfilDocenteService.crearPerfil({
         cuentaId: cuentaId,
         nombreCompleto: entrada.nombreCompleto.trim(),
-        gradoAcademico: entrada.gradoAcademico.trim(),
-        facultad: entrada.facultad.trim(),
-        departamento: entrada.departamento?.trim(),
-        codigoInstitucional: entrada.codigoInstitucional?.trim(),
+        gradoAcademico: entrada.gradoAcademico?.trim() || 'Mg.',
       });
     } catch (error) {
       await db.delete(cuentasAutenticacion).where(eq(cuentasAutenticacion.id, cuentaId));
@@ -103,7 +101,6 @@ export class AuthService {
     }
 
     const hashIngresado = await hashContrasena(correoFormateado, credenciales.contrasena);
-    // Cuentas antiguas: la contraseña estaba en texto plano
     const correcta = esHash(cuenta.contrasenaHash)
       ? cuenta.contrasenaHash === hashIngresado
       : cuenta.contrasenaHash === credenciales.contrasena;
@@ -167,7 +164,7 @@ export class AuthService {
   }
 
   /**
-   * Comprueba el código sin consumirlo; el guardado vuelve a comprobarlo
+   * Comprueba el código sin consumirlo
    */
   static async verificarCodigoRecuperacion(correo: string, codigo: string): Promise<number> {
     const correoFormateado = normalizar(correo);
@@ -183,7 +180,6 @@ export class AuthService {
       throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
     }
     const hash = await hashContrasena(correoFormateado, codigo.trim());
-    // Otro envío o validación puede haber cambiado el código mientras se calculaba el hash.
     if (codigosRecuperacion.get(correoFormateado) !== pendiente || pendiente.expiraEn <= Date.now()) throw new Error('El código cambió o venció. Solicita uno nuevo.');
     if (pendiente.intentos >= MAX_INTENTOS) throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
     if (pendiente.codigoHash !== hash) {
@@ -203,7 +199,6 @@ export class AuthService {
       const cuenta = await buscarCuenta(correoFormateado);
       if (!cuenta?.esActivo) throw new Error('La cuenta no existe o está desactivada.');
       const nuevaHash = await hashContrasena(correoFormateado, nuevaContrasena);
-      // Se comprueba otra vez si hubo un reenvío durante la consulta de cuenta.
       await this.verificarCodigoRecuperacion(correoFormateado, codigo);
       await db.update(cuentasAutenticacion)
         .set({ contrasenaHash: nuevaHash, actualizadoEn: new Date().toISOString() })

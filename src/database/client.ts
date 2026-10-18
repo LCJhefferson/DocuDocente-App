@@ -11,7 +11,7 @@ expoDb.execSync('PRAGMA foreign_keys = ON;');
 export const db = drizzle(expoDb, { schema });
 
 /**
- * Función auxiliar de desarrollo para resetear la base de datos
+ * Función auxiliar de desarrollo para resetear la base de datos completa
  */
 export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
   try {
@@ -33,15 +33,35 @@ export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
 };
 
 /**
+ * Detecta y elimina la tabla perfiles_docente antigua si aún contiene la columna 'facultad'
+ */
+const migrarPerfilesDocente = () => {
+  try {
+    const columnas = expoDb
+      .getAllSync<{ name: string }>('PRAGMA table_info(perfiles_docente);')
+      .map((c) => c.name);
+
+    if (columnas.includes('facultad')) {
+      // Como perfiles_docente tiene referencias en otras tablas, desactivamos temporales foreign keys para recrearla
+      expoDb.execSync(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS perfiles_docente;
+        PRAGMA foreign_keys = ON;
+      `);
+      console.log('[DB] Tabla perfiles_docente antigua eliminada para aplicar la versión simplificada.');
+    }
+  } catch (e) {
+    console.log('[DB Migración Perfil] No se requirió migración.');
+  }
+};
+
+/**
  * BD creadas con la versión anterior: resultados_unidad tenía informe_id NOT NULL
- * y sin curso_id / tipo_grafico. SQLite no permite quitar un NOT NULL con ALTER,
- * así que se reconstruye la tabla conservando los datos.
- * También limpia los informes BORRADOR automáticos que creaba el módulo de notas.
  */
 const migrarResultadosUnidad = () => {
   const columnas = expoDb.getAllSync<{ name: string; notnull: number }>('PRAGMA table_info(resultados_unidad);');
   const informeId = columnas.find((c) => c.name === 'informe_id');
-  if (!informeId || informeId.notnull === 0) return; // ya está actualizada
+  if (!informeId || informeId.notnull === 0) return;
 
   const tiene = (nombre: string) => columnas.some((c) => c.name === nombre);
 
@@ -75,7 +95,7 @@ const migrarResultadosUnidad = () => {
 };
 
 /**
- * BD creadas antes de las plantillas inteligentes: agrega nombre, tipo y definicion (JSON)
+ * BD creadas antes de las plantillas inteligentes
  */
 const migrarPlantillas = () => {
   const columnas = expoDb.getAllSync<{ name: string }>('PRAGMA table_info(plantillas);').map((c) => c.name);
@@ -101,6 +121,10 @@ const migrarPlantillas = () => {
  */
 export const initDatabase = async (): Promise<void> => {
   try {
+    // 1. Limpieza de tablas obsoletas si existen
+    migrarPerfilesDocente();
+
+    // 2. Creación de la estructura limpia de tablas
     expoDb.execSync(`
       CREATE TABLE IF NOT EXISTS cuentas_autenticacion (
         id TEXT PRIMARY KEY NOT NULL,
@@ -116,10 +140,6 @@ export const initDatabase = async (): Promise<void> => {
         cuenta_id TEXT UNIQUE NOT NULL REFERENCES cuentas_autenticacion(id) ON DELETE CASCADE,
         nombre_completo TEXT NOT NULL,
         grado_academico TEXT NOT NULL DEFAULT 'Mg.',
-        facultad TEXT NOT NULL,
-        departamento TEXT,
-        codigo_institucional TEXT,
-        avatar_uri TEXT,
         creado_en TEXT NOT NULL,
         actualizado_en TEXT NOT NULL
       );
@@ -211,7 +231,7 @@ export const initDatabase = async (): Promise<void> => {
     migrarResultadosUnidad();
     migrarPlantillas();
 
-    // AUTO-SIEMBRA: Garantiza que la cuenta y perfil por defecto existan en SQLite
+    // AUTO-SIEMBRA SIMPLIFICADA
     const perfiles = expoDb.getAllSync('SELECT id FROM perfiles_docente LIMIT 1;');
     if (perfiles.length === 0) {
       const ahora = new Date().toISOString();
@@ -219,8 +239,8 @@ export const initDatabase = async (): Promise<void> => {
         INSERT OR IGNORE INTO cuentas_autenticacion (id, correo_electronico, contrasena_hash, es_activo, creado_en, actualizado_en)
         VALUES ('cuenta_default', 'docente@ejemplo.com', '123456', 1, '${ahora}', '${ahora}');
 
-        INSERT OR IGNORE INTO perfiles_docente (id, cuenta_id, nombre_completo, grado_academico, facultad, creado_en, actualizado_en)
-        VALUES ('perfil_default', 'cuenta_default', 'Docente General', 'Mg.', 'Ingeniería', '${ahora}', '${ahora}');
+        INSERT OR IGNORE INTO perfiles_docente (id, cuenta_id, nombre_completo, grado_academico, creado_en, actualizado_en)
+        VALUES ('perfil_default', 'cuenta_default', 'Docente General', 'Mg.', '${ahora}', '${ahora}');
       `);
       console.log('[DB] Perfil docente por defecto creado en SQLite.');
     }

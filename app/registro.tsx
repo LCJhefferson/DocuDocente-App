@@ -1,4 +1,3 @@
-import { RequisitosContrasena } from '../src/components/cuenta/RequisitosContrasena';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -16,23 +15,22 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { RequisitosContrasena } from '../src/components/cuenta/RequisitosContrasena';
 import { useAuth } from '../src/context/AuthContext';
-import { esCorreoValido, validarContrasena, validarNombre, validarPerfil } from '../src/utils/validaciones';
+import { esCorreoValido, validarContrasena, validarNombre } from '../src/utils/validaciones';
 
 export default function RegistroScreen() {
   const router = useRouter();
   const { registrarse } = useAuth();
-  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [paso, setPaso] = useState<1 | 2>(1);
   const [cargando, setCargando] = useState(false);
   const enCurso = useRef(false);
 
+  // Paso 1: Datos Personales
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [gradoAcademico, setGradoAcademico] = useState('');
 
-  const [facultad, setFacultad] = useState('');
-  const [departamento, setDepartamento] = useState('');
-  const [codigoInstitucional, setCodigoInstitucional] = useState('');
-
+  // Paso 2: Credenciales
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
@@ -41,14 +39,9 @@ export default function RegistroScreen() {
   const [mostrarConfirmarContrasena, setMostrarConfirmarContrasena] = useState(false);
 
   const obtenerImagenPaso = () => {
-    switch (paso) {
-      case 1:
-        return require('../assets/images/paso1_huevo.png');
-      case 2:
-        return require('../assets/images/paso2_polluelo.png');
-      case 3:
-        return require('../assets/images/paso3_ave.png');
-    }
+    return paso === 1
+      ? require('../assets/images/paso1_huevo.png')
+      : require('../assets/images/paso3_ave.png');
   };
 
   const manejarAvanzarPaso1 = () => {
@@ -60,15 +53,8 @@ export default function RegistroScreen() {
     setPaso(2);
   };
 
-  const manejarAvanzarPaso2 = () => {
-    const problema = validarPerfil({ nombreCompleto, gradoAcademico, facultad, departamento, codigoInstitucional });
-    if (problema) { Alert.alert('Revisa tus datos', problema); return; }
-    setPaso(3);
-  };
-
   const manejarAtras = () => {
-    if (paso === 3) setPaso(2);
-    else if (paso === 2) setPaso(1);
+    if (paso === 2) setPaso(1);
     else router.back();
   };
 
@@ -80,7 +66,7 @@ export default function RegistroScreen() {
     }
 
     if (!esCorreoValido(correoElectronico)) {
-      Alert.alert('Correo inválido', 'Ingresa un correo válido, por ejemplo nombre@gmail.com. También puedes usar Outlook u otro proveedor.');
+      Alert.alert('Correo inválido', 'Ingresa un correo válido (ejemplo: nombre@gmail.com).');
       return;
     }
 
@@ -100,10 +86,7 @@ export default function RegistroScreen() {
     try {
       await registrarse({
         nombreCompleto: nombreCompleto.trim(),
-        gradoAcademico: gradoAcademico.trim(),
-        facultad: facultad.trim(),
-        departamento: departamento.trim(),
-        codigoInstitucional: codigoInstitucional.trim(),
+        gradoAcademico: gradoAcademico.trim() || 'Mg.',
         correoElectronico: correoElectronico.trim(),
         contrasena,
       });
@@ -128,14 +111,12 @@ export default function RegistroScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Botón superior de retroceso cuando se avanza de paso */}
-          {paso > 1 && (
-            <TouchableOpacity onPress={manejarAtras} style={styles.botonAtrasHeader}>
-              <Ionicons name="arrow-back" size={24} color="#1C252C" />
-            </TouchableOpacity>
-          )}
+          {/* Botón superior de retroceso */}
+          <TouchableOpacity onPress={manejarAtras} style={styles.botonAtrasHeader}>
+            <Ionicons name="arrow-back" size={24} color="#1C252C" />
+          </TouchableOpacity>
 
-          {/* Imagen dinámica según el paso activo */}
+          {/* Imagen según el paso activo */}
           <View style={styles.contenedorLogo}>
             <Image
               source={obtenerImagenPaso()}
@@ -146,11 +127,11 @@ export default function RegistroScreen() {
 
           <Text style={styles.tituloSecundario}>Crear cuenta</Text>
 
-          {/* PASO 1: Datos Básicos */}
+          {/* PASO 1: Datos Personales */}
           {paso === 1 && (
             <View style={styles.formulario}>
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>Nombre completo</Text>
+                <Text style={styles.label}>Nombre completo *</Text>
                 <TextInput
                   style={styles.input}
                   value={nombreCompleto}
@@ -167,7 +148,7 @@ export default function RegistroScreen() {
                   value={gradoAcademico}
                   maxLength={40}
                   onChangeText={setGradoAcademico}
-                  placeholder=""
+                  placeholder="Mg."
                 />
               </View>
 
@@ -181,72 +162,25 @@ export default function RegistroScreen() {
             </View>
           )}
 
-          {/* PASO 2: Datos Institucionales */}
+          {/* PASO 2: Credenciales de Acceso */}
           {paso === 2 && (
             <View style={styles.formulario}>
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>Facultad</Text>
-                <TextInput
-                  style={styles.input}
-                  value={facultad}
-                  maxLength={200}
-                  onChangeText={setFacultad}
-                  placeholder=""
-                />
-              </View>
-
-              <View style={styles.grupoInput}>
-                <Text style={styles.label}>Departamento</Text>
-                <TextInput
-                  style={styles.input}
-                  value={departamento}
-                  maxLength={200}
-                  onChangeText={setDepartamento}
-                  placeholder=""
-                />
-              </View>
-
-              <View style={styles.grupoInput}>
-                <Text style={styles.label}>Código Institucional</Text>
-                <TextInput
-                  style={styles.input}
-                  value={codigoInstitucional}
-                  maxLength={30}
-                  onChangeText={setCodigoInstitucional}
-                  placeholder=""
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.botonPrincipal}
-                onPress={manejarAvanzarPaso2}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.textoBoton}>Siguiente</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* PASO 3: Credenciales de Acceso */}
-          {paso === 3 && (
-            <View style={styles.formulario}>
-              <View style={styles.grupoInput}>
-                <Text style={styles.label}>Correo electrónico</Text>
+                <Text style={styles.label}>Correo electrónico *</Text>
                 <TextInput
                   style={styles.input}
                   value={correoElectronico}
                   autoCorrect={false}
-                  accessibilityHint="Se acepta cualquier proveedor de correo electrónico."
                   maxLength={254}
                   onChangeText={setCorreoElectronico}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  placeholder="nombre@gmail.com"
+                  placeholder=""
                 />
               </View>
 
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>Contraseña</Text>
+                <Text style={styles.label}>Contraseña *</Text>
                 <View style={styles.contenedorPassword}>
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
@@ -256,7 +190,6 @@ export default function RegistroScreen() {
                     maxLength={128}
                     onChangeText={setContrasena}
                     secureTextEntry={!mostrarContrasena}
-                    placeholder=""
                   />
                   <TouchableOpacity
                     onPress={() => setMostrarContrasena(!mostrarContrasena)}
@@ -275,7 +208,13 @@ export default function RegistroScreen() {
               <RequisitosContrasena valor={contrasena} />
 
               <View style={[styles.grupoInput, { marginTop: 20 }]}>
-                <Text style={styles.label}>{confirmarContrasena ? (confirmarContrasena === contrasena ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden') : 'Confirmar contraseña'}</Text>
+                <Text style={styles.label}>
+                  {confirmarContrasena
+                    ? confirmarContrasena === contrasena
+                      ? 'Las contraseñas coinciden'
+                      : 'Las contraseñas no coinciden'
+                    : 'Confirmar contraseña *'}
+                </Text>
                 <View style={styles.contenedorPassword}>
                   <TextInput
                     style={[styles.input, styles.inputPassword]}
@@ -285,7 +224,6 @@ export default function RegistroScreen() {
                     maxLength={128}
                     onChangeText={setConfirmarContrasena}
                     secureTextEntry={!mostrarConfirmarContrasena}
-                    placeholder=""
                   />
                   <TouchableOpacity
                     onPress={() => setMostrarConfirmarContrasena(!mostrarConfirmarContrasena)}
@@ -302,10 +240,14 @@ export default function RegistroScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.botonPrincipal, (cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena) && { opacity: 0.5 }]}
+                style={[
+                  styles.botonPrincipal,
+                  (cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena) && {
+                    opacity: 0.5,
+                  },
+                ]}
                 onPress={manejarRegistroFinal}
                 disabled={cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena}
-                accessibilityState={{ disabled: cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena }}
                 activeOpacity={0.85}
               >
                 {cargando ? (
@@ -317,11 +259,10 @@ export default function RegistroScreen() {
             </View>
           )}
 
-          {/* Paginador de 3 Puntos (Dots) */}
+          {/* Paginador de 2 Puntos */}
           <View style={styles.contenedorPuntos}>
             <View style={[styles.punto, paso === 1 ? styles.puntoActivo : styles.puntoInactivo]} />
             <View style={[styles.punto, paso === 2 ? styles.puntoActivo : styles.puntoInactivo]} />
-            <View style={[styles.punto, paso === 3 ? styles.puntoActivo : styles.puntoInactivo]} />
           </View>
 
           {/* Enlace para Iniciar Sesión */}
@@ -338,13 +279,8 @@ export default function RegistroScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  contenedorFlex: {
-    flex: 1,
-  },
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  contenedorFlex: { flex: 1 },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -364,10 +300,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 8,
   },
-  logoImagen: {
-    width: '100%',
-    height: 180,
-  },
+  logoImagen: { width: '100%', height: 180 },
   tituloSecundario: {
     fontSize: 22,
     fontWeight: '700',
@@ -375,18 +308,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  formulario: {
-    width: '100%',
-  },
-  grupoInput: {
-    marginBottom: 22,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#83968C',
-    marginBottom: 2,
-  },
+  formulario: { width: '100%' },
+  grupoInput: { marginBottom: 22 },
+  label: { fontSize: 13, fontWeight: '500', color: '#83968C', marginBottom: 2 },
   input: {
     borderBottomWidth: 1.2,
     borderBottomColor: '#1E88E5',
@@ -395,19 +319,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 0,
   },
-  contenedorPassword: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  inputPassword: {
-    paddingRight: 36,
-  },
-  iconoOjo: {
-    position: 'absolute',
-    right: 0,
-    bottom: 6,
-    padding: 4,
-  },
+  contenedorPassword: { position: 'relative', justifyContent: 'center' },
+  inputPassword: { paddingRight: 36 },
+  iconoOjo: { position: 'absolute', right: 0, bottom: 6, padding: 4 },
   botonPrincipal: {
     backgroundColor: '#1E88E5',
     paddingVertical: 14,
@@ -420,11 +334,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
-  textoBoton: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  textoBoton: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   contenedorPuntos: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -433,29 +343,14 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginBottom: 20,
   },
-  punto: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  puntoActivo: {
-    backgroundColor: '#000000',
-  },
-  puntoInactivo: {
-    backgroundColor: '#C5D1D7',
-  },
+  punto: { width: 10, height: 10, borderRadius: 5 },
+  puntoActivo: { backgroundColor: '#000000' },
+  puntoInactivo: { backgroundColor: '#C5D1D7' },
   contenedorLoginLink: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  textoYaCuenta: {
-    fontSize: 14,
-    color: '#8A999F',
-  },
-  textoIniciarSesion: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E88E5',
-  },
+  textoYaCuenta: { fontSize: 14, color: '#8A999F' },
+  textoIniciarSesion: { fontSize: 14, fontWeight: '700', color: '#1E88E5' },
 });

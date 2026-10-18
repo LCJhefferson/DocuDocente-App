@@ -1,4 +1,3 @@
-// app/modal.tsx
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -23,26 +22,20 @@ export default function PerfilModalScreen() {
   const [cargando, setCargando] = useState(false);
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [gradoAcademico, setGradoAcademico] = useState('');
-  const [facultad, setFacultad] = useState('');
-  const [departamento, setDepartamento] = useState('');
-  const [codigoInstitucional, setCodigoInstitucional] = useState('');
 
-  // Cargar datos actuales del perfil en el formulario
+  // Cargar datos actuales del perfil docente
   useEffect(() => {
     if (perfilDocente) {
       setNombreCompleto(perfilDocente.nombreCompleto || '');
-      setGradoAcademico(perfilDocente.gradoAcademico || '');
-      setFacultad(perfilDocente.facultad || '');
-      setDepartamento(perfilDocente.departamento || '');
-      setCodigoInstitucional(perfilDocente.codigoInstitucional || '');
+      setGradoAcademico(perfilDocente.gradoAcademico || 'Mg.');
     }
   }, [perfilDocente]);
 
   const guardarCambios = async () => {
     if (!cuentaId) return;
 
-    if (!nombreCompleto.trim() || !facultad.trim()) {
-      Alert.alert('Atención', 'El Nombre Completo y la Facultad son obligatorios.');
+    if (!nombreCompleto.trim()) {
+      Alert.alert('Atención', 'El Nombre Completo es obligatorio.');
       return;
     }
 
@@ -50,10 +43,7 @@ export default function PerfilModalScreen() {
     try {
       await PerfilDocenteService.actualizarPerfil(cuentaId, {
         nombreCompleto: nombreCompleto.trim(),
-        gradoAcademico: gradoAcademico.trim(),
-        facultad: facultad.trim(),
-        departamento: departamento.trim(),
-        codigoInstitucional: codigoInstitucional.trim(),
+        gradoAcademico: gradoAcademico.trim() || 'Mg.',
       });
 
       await recargarPerfil();
@@ -88,7 +78,7 @@ export default function PerfilModalScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.encabezadoModal}>
           <Text style={styles.titulo}>Mi Perfil Docente</Text>
-          <Text style={styles.subtitulo}>Actualiza tu información personal e institucional</Text>
+          <Text style={styles.subtitulo}>Actualiza tus datos de presentación para los informes</Text>
         </View>
 
         <View style={styles.tarjetaFormulario}>
@@ -100,42 +90,12 @@ export default function PerfilModalScreen() {
             placeholder="Ej: Dr. Juan Pérez"
           />
 
-          <View style={styles.filaCampos}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.etiqueta}>Grado Académico</Text>
-              <TextInput
-                style={styles.entrada}
-                value={gradoAcademico}
-                onChangeText={setGradoAcademico}
-                placeholder="Mg. / Dr."
-              />
-            </View>
-
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.etiqueta}>Facultad *</Text>
-              <TextInput
-                style={styles.entrada}
-                value={facultad}
-                onChangeText={setFacultad}
-                placeholder="Ej: FISME"
-              />
-            </View>
-          </View>
-
-          <Text style={styles.etiqueta}>Departamento Académico</Text>
+          <Text style={styles.etiqueta}>Grado Académico</Text>
           <TextInput
             style={styles.entrada}
-            value={departamento}
-            onChangeText={setDepartamento}
-            placeholder="Ej: Ingeniería de Sistemas"
-          />
-
-          <Text style={styles.etiqueta}>Código Institucional</Text>
-          <TextInput
-            style={styles.entrada}
-            value={codigoInstitucional}
-            onChangeText={setCodigoInstitucional}
-            placeholder="Ej: DOC-2026-01"
+            value={gradoAcademico}
+            onChangeText={setGradoAcademico}
+            placeholder="Mg. / Dr."
           />
 
           <TouchableOpacity
@@ -150,6 +110,12 @@ export default function PerfilModalScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.botonCerrarSesion}
+            onPress={manejarCerrarSesion}
+          >
+            <Text style={styles.textoCerrarSesion}>Cerrar Sesión</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -182,7 +148,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontSize: 15,
   },
-  filaCampos: { flexDirection: 'row', justifyContent: 'space-between' },
   botonGuardar: {
     backgroundColor: '#003366',
     borderRadius: 8,
@@ -198,5 +163,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
-
+  textoCerrarSesion: { color: '#d32f2f', fontWeight: '700', fontSize: 15 },
 });

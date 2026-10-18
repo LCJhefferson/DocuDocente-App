@@ -40,9 +40,7 @@ export const validarNombre = (valor: string): string | null =>
   (/^[\p{L}\p{M} .'’-]+$/u.test(valor.trim()) && /\p{L}/u.test(valor)
     ? null : 'El nombre debe contener letras; puede incluir tildes, espacios, apóstrofos y guiones.');
 
-type PerfilEntrada = { nombreCompleto: string; gradoAcademico: string; facultad: string; departamento?: string | null; codigoInstitucional?: string | null };
-export const validarPerfil = (p: PerfilEntrada): string | null =>
-  validarNombre(p.nombreCompleto) ?? validarTexto(p.gradoAcademico, 'Grado académico', 40, false) ??
-  validarTexto(p.facultad, 'Facultad', 200) ?? validarTexto(p.departamento, 'Departamento', 200, false) ??
-  validarTexto(p.codigoInstitucional, 'Código institucional', 30, false) ??
-  (p.codigoInstitucional?.trim() && !/^[\p{L}\p{N}_-]+$/u.test(p.codigoInstitucional.trim()) ? 'El código institucional solo admite letras, números, guion y guion bajo.' : null);
+type PerfilEntrada = { nombreCompleto: string; gradoAcademico?: string };
+export const validarPerfil = (p: Partial<PerfilEntrada>): string | null =>
+  validarNombre(p.nombreCompleto ?? '') ?? 
+  validarTexto(p.gradoAcademico, 'Grado académico', 40, false);

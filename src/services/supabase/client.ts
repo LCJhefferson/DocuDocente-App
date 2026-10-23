@@ -3,14 +3,24 @@ import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 
 // Carga de variables de entorno públicas desde el archivo .env
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
+const rawKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+// Verifica si las credenciales de Supabase están correctamente configuradas
+export const esConfigSupabaseValida = Boolean(
+  rawUrl && rawKey && rawUrl.startsWith('http')
+);
+
+if (!esConfigSupabaseValida) {
   console.warn(
-    '[Supabase Client] Advertencia: Asegúrate de configurar EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en tu archivo .env'
+    '[Supabase Client] ADVERTENCIA: No se encontraron las variables EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY válidas en el archivo .env. ' +
+      'Se utilizará un cliente de respaldo para evitar que la aplicación falle al iniciar.'
   );
 }
+
+// Se asigna una URL de respaldo válida para evitar que `createClient` lance un Uncaught Error si faltan las variables
+const SUPABASE_URL = esConfigSupabaseValida ? rawUrl! : 'https://placeholder-docudocente.supabase.co';
+const SUPABASE_ANON_KEY = esConfigSupabaseValida ? rawKey! : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_key';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

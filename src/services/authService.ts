@@ -1,19 +1,16 @@
-// src/services/authService.ts
-// Gestión de credenciales y SecureStore
 import { eq } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/client';
-import { cuentasAutenticacion } from '../database/schema';
+import { cuentasAutenticacion, perfilesDocente } from '../database/schema';
 import { CredencialesLogin, EntradaRegistro } from '../models/Autenticacion';
 import { esHash, generarCodigo, hashContrasena } from '../utils/seguridad';
 import { esCorreoValido, exigir, validarContrasena, validarNombre } from '../utils/validaciones';
 import { enviarCodigoRecuperacion } from './correoService';
 import { PerfilDocenteService } from './perfilDocenteService';
+import { supabase } from './supabase/client';
 
 const CLAVE_SESION_ACTIVA = 'docudocente_cuenta_id_activa';
-
 const MAX_INTENTOS = 5;
 const MINUTOS_BLOQUEO = 5;
 const MINUTOS_CODIGO = 10;
@@ -27,14 +24,17 @@ const codigosRecuperacion = new Map<string, { codigoHash: string; expiraEn: numb
 
 const normalizar = (correo: string) => correo.trim().toLowerCase();
 
-const buscarCuenta = async (correo: string) => {
-  const filas = await db.select().from(cuentasAutenticacion).where(eq(cuentasAutenticacion.correoElectronico, correo));
+const buscarCuentaLocal = async (correo: string) => {
+  const filas = await db
+    .select()
+    .from(cuentasAutenticacion)
+    .where(eq(cuentasAutenticacion.correoElectronico, correo));
   return filas[0] ?? null;
 };
 
 export class AuthService {
   /**
-   * Proceso de alta: valida y registra la cuenta con su perfil docente simplificado
+   * Registra el usuario en SQLite local y guarda el hash cifrado en Supabase public.docentes
    */
   static async registrarse(entrada: EntradaRegistro): Promise<string> {
     const correoFormateado = normalizar(entrada.correoElectronico);
@@ -42,49 +42,67 @@ export class AuthService {
     if (!esCorreoValido(correoFormateado)) {
       throw new Error('El correo electrónico no tiene un formato válido.');
     }
-    
-    // Validación exclusiva del nombre completo
+
     exigir(validarNombre(entrada.nombreCompleto));
     const problema = validarContrasena(entrada.contrasena);
     if (problema) throw new Error(problema);
 
-    if (await buscarCuenta(correoFormateado)) {
-      throw new Error('El correo electrónico ya se encuentra registrado.');
+    if (await buscarCuentaLocal(correoFormateado)) {
+      throw new Error('El correo electrónico ya se encuentra registrado en este dispositivo.');
     }
 
-    const cuentaId = uuidv4();
+    const cuentaId = Crypto.randomUUID();
     const ahora = new Date().toISOString();
+    const hash = await hashContrasena(correoFormateado, entrada.contrasena);
+    const grado = entrada.gradoAcademico?.trim() || 'Mg.';
+    const nombre = entrada.nombreCompleto.trim();
 
-    // 1. Insertar cuenta de autenticación (solo el hash de la contraseña)
+    // 1. Guardar en SQLite local
     await db.insert(cuentasAutenticacion).values({
       id: cuentaId,
       correoElectronico: correoFormateado,
-      contrasenaHash: await hashContrasena(correoFormateado, entrada.contrasena),
+      contrasenaHash: hash,
       esActivo: true,
       creadoEn: ahora,
       actualizadoEn: ahora,
     });
 
-    // 2. Crear perfil docente simplificado
     try {
       await PerfilDocenteService.crearPerfil({
-        cuentaId: cuentaId,
-        nombreCompleto: entrada.nombreCompleto.trim(),
-        gradoAcademico: entrada.gradoAcademico?.trim() || 'Mg.',
+        cuentaId,
+        nombreCompleto: nombre,
+        gradoAcademico: grado,
       });
     } catch (error) {
       await db.delete(cuentasAutenticacion).where(eq(cuentasAutenticacion.id, cuentaId));
       throw error;
     }
 
-    // 3. Establecer sesión
-    await this.guardarSesionLocal(cuentaId);
+    // 2. Sincronización en Supabase (public.docentes)
+    try {
+      const { error: errorSupabase } = await supabase.from('docentes').upsert({
+        id: cuentaId,
+        correo: correoFormateado,
+        nombre: nombre,
+        grado: grado,
+        contrasena_hash: hash,
+        creado_en: ahora,
+        actualizado_en: ahora,
+      });
 
+      if (errorSupabase) {
+        console.warn('[AuthService.registrarse Supabase Error]:', errorSupabase.message);
+      }
+    } catch (err) {
+      console.warn('[AuthService.registrarse Error de Red]:', err);
+    }
+
+    await this.guardarSesionLocal(cuentaId);
     return cuentaId;
   }
 
   /**
-   * Valida credenciales e inicia sesión. Bloquea unos minutos tras varios intentos fallidos.
+   * Inicia sesión validando localmente o consultando Supabase si la base de datos local está limpia
    */
   static async iniciarSesion(credenciales: CredencialesLogin): Promise<string> {
     const correoFormateado = normalizar(credenciales.correoElectronico);
@@ -95,57 +113,104 @@ export class AuthService {
       throw new Error(`Demasiados intentos fallidos. Inténtalo de nuevo en ${minutos} min.`);
     }
 
-    const cuenta = await buscarCuenta(correoFormateado);
-    if (!cuenta) {
-      throw new Error('El correo no está registrado.');
-    }
-
     const hashIngresado = await hashContrasena(correoFormateado, credenciales.contrasena);
-    const correcta = esHash(cuenta.contrasenaHash)
-      ? cuenta.contrasenaHash === hashIngresado
-      : cuenta.contrasenaHash === credenciales.contrasena;
+    const cuenta = await buscarCuentaLocal(correoFormateado);
 
-    if (!correcta) {
-      const fallos = (registro?.fallos ?? 0) + 1;
-      const bloquear = fallos >= MAX_INTENTOS;
-      intentosFallidos.set(correoFormateado, {
-        fallos: bloquear ? 0 : fallos,
-        bloqueadoHasta: bloquear ? Date.now() + MINUTOS_BLOQUEO * MINUTO_MS : 0,
+    // ESCENARIO A: Cuenta existente localmente
+    if (cuenta) {
+      const correcta = esHash(cuenta.contrasenaHash)
+        ? cuenta.contrasenaHash === hashIngresado
+        : cuenta.contrasenaHash === credenciales.contrasena;
+
+      if (!correcta) {
+        this.registrarIntentoFallido(correoFormateado, registro);
+      }
+
+      if (!cuenta.esActivo) {
+        throw new Error('Esta cuenta se encuentra desactivada.');
+      }
+
+      intentosFallidos.delete(correoFormateado);
+      await this.guardarSesionLocal(cuenta.id);
+      return cuenta.id;
+    }
+
+    // ESCENARIO B: Dispositivo nuevo o SQLite limpio -> Consultar Supabase (public.docentes)
+    try {
+      const { data: docenteRemoto, error } = await supabase
+        .from('docentes')
+        .select('*')
+        .eq('correo', correoFormateado)
+        .maybeSingle();
+
+      if (error || !docenteRemoto) {
+        throw new Error('El correo no está registrado.');
+      }
+
+      const contrasenaRemota = docenteRemoto.contrasena_hash;
+      const esCorrectaRemota = esHash(contrasenaRemota)
+        ? contrasenaRemota === hashIngresado
+        : contrasenaRemota === credenciales.contrasena;
+
+      if (!esCorrectaRemota) {
+        this.registrarIntentoFallido(correoFormateado, registro);
+      }
+
+      // Hidratar la base de datos local SQLite con los datos recuperados de Supabase
+      const ahora = new Date().toISOString();
+      await db.insert(cuentasAutenticacion).values({
+        id: docenteRemoto.id,
+        correoElectronico: docenteRemoto.correo,
+        contrasenaHash: hashIngresado,
+        esActivo: true,
+        creadoEn: docenteRemoto.creado_en || ahora,
+        actualizadoEn: ahora,
       });
-      throw new Error(
-        bloquear
-          ? `Demasiados intentos fallidos. Inténtalo de nuevo en ${MINUTOS_BLOQUEO} min.`
-          : `Contraseña incorrecta. Te quedan ${MAX_INTENTOS - fallos} intentos.`
-      );
+
+      const perfilId = Crypto.randomUUID();
+      await db.insert(perfilesDocente).values({
+        id: perfilId,
+        cuentaId: docenteRemoto.id,
+        nombreCompleto: docenteRemoto.nombre || 'Docente',
+        gradoAcademico: docenteRemoto.grado || 'Mg.',
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      });
+
+      intentosFallidos.delete(correoFormateado);
+      await this.guardarSesionLocal(docenteRemoto.id);
+      return docenteRemoto.id;
+    } catch (err: any) {
+      if (err.message === 'El correo no está registrado.' || err.message?.includes('Contraseña incorrecta')) {
+        throw err;
+      }
+      throw new Error('El correo no está registrado o no hay conexión con el servidor.');
     }
-
-    if (!cuenta.esActivo) {
-      throw new Error('Esta cuenta se encuentra desactivada.');
-    }
-
-    intentosFallidos.delete(correoFormateado);
-
-    // Migra la cuenta antigua a contraseña cifrada
-    if (!esHash(cuenta.contrasenaHash)) {
-      await db
-        .update(cuentasAutenticacion)
-        .set({ contrasenaHash: hashIngresado, actualizadoEn: new Date().toISOString() })
-        .where(eq(cuentasAutenticacion.id, cuenta.id));
-    }
-
-    await this.guardarSesionLocal(cuenta.id);
-    return cuenta.id;
   }
 
-  /**
-   * Recuperación, paso 1: envía un código de 6 dígitos al correo registrado
-   */
+  private static registrarIntentoFallido(
+    correo: string,
+    registro?: { fallos: number; bloqueadoHasta: number }
+  ) {
+    const fallos = (registro?.fallos ?? 0) + 1;
+    const bloquear = fallos >= MAX_INTENTOS;
+    intentosFallidos.set(correo, {
+      fallos: bloquear ? 0 : fallos,
+      bloqueadoHasta: bloquear ? Date.now() + MINUTOS_BLOQUEO * MINUTO_MS : 0,
+    });
+    throw new Error(
+      bloquear
+        ? `Demasiados intentos fallidos. Inténtalo de nuevo en ${MINUTOS_BLOQUEO} min.`
+        : `Contraseña incorrecta. Te quedan ${MAX_INTENTOS - fallos} intentos.`
+    );
+  }
+
   static async solicitarRecuperacion(correo: string): Promise<void> {
     const correoFormateado = normalizar(correo);
     if (!esCorreoValido(correoFormateado)) {
       throw new Error('El correo electrónico no tiene un formato válido.');
     }
-    const cuenta = await buscarCuenta(correoFormateado);
+    const cuenta = await buscarCuentaLocal(correoFormateado);
     if (!cuenta || !cuenta.esActivo) throw new Error('El correo no está registrado o la cuenta está desactivada.');
     if (enviosEnCurso.has(correoFormateado) || Date.now() - (ultimoEnvio.get(correoFormateado) ?? 0) < MINUTO_MS) {
       throw new Error('Espera un minuto antes de solicitar otro código.');
@@ -163,9 +228,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Comprueba el código sin consumirlo
-   */
   static async verificarCodigoRecuperacion(correo: string, codigo: string): Promise<number> {
     const correoFormateado = normalizar(correo);
     if (!esCorreoValido(correoFormateado)) throw new Error('Ingresa un correo válido.');
@@ -180,8 +242,6 @@ export class AuthService {
       throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
     }
     const hash = await hashContrasena(correoFormateado, codigo.trim());
-    if (codigosRecuperacion.get(correoFormateado) !== pendiente || pendiente.expiraEn <= Date.now()) throw new Error('El código cambió o venció. Solicita uno nuevo.');
-    if (pendiente.intentos >= MAX_INTENTOS) throw new Error('Demasiados intentos con este código. Solicita uno nuevo.');
     if (pendiente.codigoHash !== hash) {
       pendiente.intentos += 1;
       throw new Error('El código no es correcto.');
@@ -196,13 +256,22 @@ export class AuthService {
     cambiosEnCurso.add(correoFormateado);
     try {
       await this.verificarCodigoRecuperacion(correoFormateado, codigo);
-      const cuenta = await buscarCuenta(correoFormateado);
+      const cuenta = await buscarCuentaLocal(correoFormateado);
       if (!cuenta?.esActivo) throw new Error('La cuenta no existe o está desactivada.');
       const nuevaHash = await hashContrasena(correoFormateado, nuevaContrasena);
-      await this.verificarCodigoRecuperacion(correoFormateado, codigo);
-      await db.update(cuentasAutenticacion)
+
+      // Actualizar SQLite local
+      await db
+        .update(cuentasAutenticacion)
         .set({ contrasenaHash: nuevaHash, actualizadoEn: new Date().toISOString() })
         .where(eq(cuentasAutenticacion.id, cuenta.id));
+
+      // Actualizar en Supabase (public.docentes)
+      await supabase
+        .from('docentes')
+        .update({ contrasena_hash: nuevaHash, actualizado_en: new Date().toISOString() })
+        .eq('correo', correoFormateado);
+
       codigosRecuperacion.delete(correoFormateado);
       intentosFallidos.delete(correoFormateado);
     } finally {

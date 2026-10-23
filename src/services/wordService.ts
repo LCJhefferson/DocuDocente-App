@@ -11,7 +11,7 @@ import { construirDocumentoDesdePlantilla } from './plantillaWordService';
 const TIPO_WORD = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 /**
- * Reúne la plantilla, los datos y los textos del informe: lo mismo que usa el PDF
+ * Consolida la plantilla, los datos y los textos estructurados para el motor de Microsoft Word (.docx)
  */
 const prepararInforme = async ({
   informe,
@@ -20,7 +20,6 @@ const prepararInforme = async ({
 }: InformeCompleto): Promise<{ definicion: DefinicionPlantilla; datos: DatosInforme; contenido: ContenidoInforme }> => {
   if (!informe.perfilDocenteId) throw new Error('Este informe no tiene un docente asociado.');
 
-  // Informe hecho con plantilla: usa su propia copia de la plantilla, lo escrito y las notas
   const guardado = informe.contenido;
   if (guardado) {
     const datos = await informeDatosService.reunir({
@@ -29,18 +28,20 @@ const prepararInforme = async ({
       unidades: guardado.unidades,
     });
     for (const dc of datos.cursos) {
-      dc.resultados = (guardado.resultados[dc.curso.id] ?? []).map((r) => ({ ...r, ...calcularResumenUnidad(r.aprobados, r.desaprobados) }));
+      dc.resultados = (guardado.resultados[dc.curso.id] ?? []).map((r) => ({
+        ...r,
+        ...calcularResumenUnidad(r.aprobados, r.desaprobados),
+      }));
     }
     return { definicion: guardado.definicion, datos, contenido: guardado.contenido };
   }
 
-  // Informe anterior a las plantillas: se usa la plantilla predeterminada o, si no hay, el oficio de unidad
   const datos = await informeDatosService.reunir({
     perfilDocenteId: informe.perfilDocenteId,
     cursoIds: informe.cursoId ? [informe.cursoId] : [],
     unidades: unidades.map((u) => u.nombreUnidad),
   });
-  // El informe guarda una copia de las notas: se usa esa, no las actuales
+
   for (const dc of datos.cursos) {
     dc.resultados = unidades.map((u) => ({
       nombreUnidad: u.nombreUnidad,
@@ -49,6 +50,7 @@ const prepararInforme = async ({
       ...calcularResumenUnidad(u.cantidadAprobados, u.cantidadDesaprobados),
     }));
   }
+
   return {
     definicion: definicion ?? definicionDelCatalogo('unidad', 'B'),
     datos,
@@ -65,7 +67,7 @@ const prepararInforme = async ({
 };
 
 /**
- * Genera el Word (.docx) en el celular y devuelve su ruta (file://...)
+ * Compila la plantilla Word a base64, escribe el archivo temporal en el dispositivo y retorna su ruta física
  */
 export const generarWordInforme = async (datosInforme: InformeCompleto): Promise<string> => {
   const { definicion, datos, contenido } = await prepararInforme(datosInforme);
@@ -78,7 +80,7 @@ export const generarWordInforme = async (datosInforme: InformeCompleto): Promise
 };
 
 /**
- * Abre el menú de compartir (Drive, WhatsApp, correo, "Guardar en el dispositivo"...) con el Word
+ * Abre la hoja de compartir nativa de Android/iOS para el archivo .docx
  */
 export const compartirWord = async (uri: string): Promise<void> => {
   if (!(await Sharing.isAvailableAsync())) {

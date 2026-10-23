@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CursoCard } from '../../src/components/cursos/CursoCard';
 import { ModalCrearCurso } from '../../src/components/modals/ModalCrearCurso';
 import { ModalOpcionesCurso } from '../../src/components/modals/ModalOpcionesCurso';
+import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
 import { useAuth } from '../../src/context/AuthContext';
 import { Curso } from '../../src/models/Curso';
 import { CursoService } from '../../src/services/cursoService';
@@ -32,19 +33,18 @@ export default function CursosScreen() {
   // Modales
   const [modalCrearVisible, setModalCrearVisible] = useState(false);
   const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
+  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
   const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
   const cargarCursos = useCallback(async () => {
     try {
       setCargando(true);
-      // Usar perfilDocente?.id o recurrir al id sembrado si no hay sesión
       const docenteId = perfilDocente?.id || 'perfil_default';
       const data = await CursoService.obtenerCursosPorDocente(docenteId, busqueda);
       setCursosList(data);
     } catch (error) {
       console.error('Error al cargar cursos:', error);
     } finally {
-      // Garantiza que la pantalla deje de cargar siempre
       setCargando(false);
     }
   }, [busqueda, perfilDocente]);
@@ -136,7 +136,7 @@ export default function CursosScreen() {
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
-          onPress={() => Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)}
+          onPress={() => setModalPerfilVisible(true)}
         >
           <Ionicons name="person-outline" size={24} color="#1C252C" />
         </TouchableOpacity>
@@ -203,6 +203,12 @@ export default function CursosScreen() {
           )}
         />
       )}
+
+      {/* MODAL PERFIL Y CONFIGURACIÓN */}
+      <ModalPerfilDocente
+        visible={modalPerfilVisible}
+        onClose={() => setModalPerfilVisible(false)}
+      />
 
       {/* MODAL CREAR CURSO */}
       <ModalCrearCurso

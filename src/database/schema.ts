@@ -101,6 +101,7 @@ export const actividades = sqliteTable('actividades', {
 // 8. EVIDENCIAS
 export const evidencias = sqliteTable('evidencias', {
   id: text('id').primaryKey(),
+  perfilDocenteId: text('perfil_docente_id').references(() => perfilesDocente.id, { onDelete: 'cascade' }),
   tipoGeneral: text('tipo_general', { enum: ['ACADEMICA', 'EXTRACURRICULAR'] })
     .default('ACADEMICA')
     .notNull(),

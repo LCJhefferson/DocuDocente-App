@@ -1,8 +1,7 @@
-// app/_layout.tsx
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -78,14 +77,13 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
-        <Stack.Screen
-          name="modal"
-          options={{
-            presentation: 'modal',
-            headerShown: true,
-            title: 'Perfil Docente',
-          }}
-        />
+        <Stack.Screen name="registro" />
+        <Stack.Screen name="recuperar" />
+        <Stack.Screen name="curso/[id]" />
+        <Stack.Screen name="curso/notas-estadisticas" />
+        <Stack.Screen name="informe/[id]" />
+        <Stack.Screen name="informe/nuevo" />
+        <Stack.Screen name="+not-found" />
       </Stack>
     </ThemeProvider>
   );

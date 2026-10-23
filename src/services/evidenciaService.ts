@@ -1,8 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
 import { db } from '../database/client';
 import { evidencias } from '../database/schema';
 import { CrearEvidenciaDTO } from '../models/Evidence';
-
 
 export const evidenciaService = {
   /**
@@ -27,24 +27,36 @@ export const evidenciaService = {
   },
 
   /**
-   * Inserta una nueva evidencia en SQLite
+   * Obtiene las evidencias extracurriculares asociadas exclusivamente al docente logueado
    */
-  async obtenerExtracurriculares() {
+  async obtenerExtracurriculares(perfilDocenteId: string) {
     try {
+      if (!perfilDocenteId) return [];
+
       return await db
         .select()
         .from(evidencias)
-        .where(eq(evidencias.tipoGeneral, 'EXTRACURRICULAR'))
+        .where(
+          and(
+            eq(evidencias.tipoGeneral, 'EXTRACURRICULAR'),
+            eq(evidencias.perfilDocenteId, perfilDocenteId)
+          )
+        )
         .orderBy(desc(evidencias.creadoEn));
     } catch (error) {
       console.error('[evidenciaService.obtenerExtracurriculares Error]:', error);
       throw error;
     }
   },
-  async crearEvidencia(dto: CrearEvidenciaDTO) {
+
+  /**
+   * Inserta una nueva evidencia en SQLite asociándole un UUID v4 válido
+   */
+  async crearEvidencia(dto: CrearEvidenciaDTO & { perfilDocenteId?: string }) {
     try {
       const nuevaEvidencia = {
-        id: Date.now().toString(),
+        id: Crypto.randomUUID(), // Genera un UUID v4 legítimo (ej. "3b2b11a8-2c3d-...")
+        perfilDocenteId: dto.perfilDocenteId ?? null,
         tipoGeneral: dto.tipoGeneral,
         cursoId: dto.cursoId ?? null,
         actividadId: dto.actividadId ?? null,
@@ -53,6 +65,7 @@ export const evidenciaService = {
         unidad: dto.unidad ?? null,
         tipoActividad: dto.tipoActividad ?? null,
         rutaArchivoLocal: dto.rutaArchivoLocal ?? null,
+        urlRemota: null,
         tipoArchivo: dto.tipoArchivo ?? 'IMAGE',
         creadoEn: new Date().toISOString(),
         actualizadoEn: new Date().toISOString(),

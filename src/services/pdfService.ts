@@ -8,7 +8,9 @@ import { informeDatosService } from './informeDatosService';
 import { construirHtmlDesdePlantilla } from './plantillaPdfService';
 
 const fotoEnBase64 = (evidencia: EvidenciaInforme) =>
-  evidencia.tipoArchivo === 'IMAGE' ? imagenEnBase64(evidencia.rutaArchivoLocal) : Promise.resolve(null);
+  evidencia.tipoArchivo === 'IMAGE' && evidencia.rutaArchivoLocal
+    ? imagenEnBase64(evidencia.rutaArchivoLocal)
+    : Promise.resolve(null);
 
 const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
   <h3>Resultados de la ${escapar(u.nombreUnidad)}</h3>
@@ -21,12 +23,11 @@ const tablaUnidad = (u: InformeCompleto['unidades'][number]) => `
   <p>${escapar(u.textoInterpretacion)}</p>`;
 
 /**
- * Construye el HTML del informe: con la plantilla predeterminada (si tiene receta) o con el oficio clásico
+ * Construye el código HTML final del informe combinando la plantilla inteligente o el formato predeterminado
  */
 export const construirHtmlInforme = async (datos: InformeCompleto): Promise<string> => {
   const { informe, unidades, definicion } = datos;
 
-  // Informe hecho con plantilla: usa su propia copia de la plantilla, lo escrito y las notas
   const guardado = informe.contenido;
   if (guardado && informe.perfilDocenteId) {
     const datosGuardados = await informeDatosService.reunir({
@@ -35,7 +36,10 @@ export const construirHtmlInforme = async (datos: InformeCompleto): Promise<stri
       unidades: guardado.unidades,
     });
     for (const dc of datosGuardados.cursos) {
-      dc.resultados = (guardado.resultados[dc.curso.id] ?? []).map((r) => ({ ...r, ...calcularResumenUnidad(r.aprobados, r.desaprobados) }));
+      dc.resultados = (guardado.resultados[dc.curso.id] ?? []).map((r) => ({
+        ...r,
+        ...calcularResumenUnidad(r.aprobados, r.desaprobados),
+      }));
     }
     return construirHtmlDesdePlantilla(guardado.definicion, datosGuardados, guardado.contenido);
   }
@@ -47,7 +51,7 @@ export const construirHtmlInforme = async (datos: InformeCompleto): Promise<stri
     cursoIds: informe.cursoId ? [informe.cursoId] : [],
     unidades: unidades.map((u) => u.nombreUnidad),
   });
-  // El informe guarda una copia de las notas: se usa esa, no las actuales
+
   for (const dc of datosInforme.cursos) {
     dc.resultados = unidades.map((u) => ({
       nombreUnidad: u.nombreUnidad,
@@ -69,13 +73,12 @@ export const construirHtmlInforme = async (datos: InformeCompleto): Promise<stri
 };
 
 /**
- * Oficio clásico de la UNTRM (cuando no hay plantilla con receta)
+ * Formato clásico de informe académico UNTRM
  */
 const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }: InformeCompleto): Promise<string> => {
-  const logo = await imagenEnBase64(plantilla.logoUri);
+  const logo = plantilla?.logoUri ? await imagenEnBase64(plantilla.logoUri) : null;
   const hayPlanMejora = unidades.some((u) => u.porcentajeDesaprobados >= LIMITE_PLAN_MEJORA);
 
-  // Evidencias agrupadas por unidad, cada una con su foto (si tiene)
   let htmlEvidencias = '';
   for (const unidad of UNIDADES_INFORME) {
     const deLaUnidad = evidencias.filter((e) => e.unidad === unidad);
@@ -100,7 +103,6 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
 <style>
   @page { margin: 22mm 20mm; }
   body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; }
-  .centro { text-align: center; }
   .encabezado { text-align: center; margin-bottom: 8px; }
   .encabezado img { max-height: 70px; margin-bottom: 4px; }
   .institucion { font-weight: bold; font-size: 12pt; }
@@ -112,7 +114,7 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
   .cabecera td { padding: 3px 6px; vertical-align: top; border: none; }
   .cabecera td:first-child { font-weight: bold; width: 70px; }
   hr { border: 0; border-top: 1px solid #000; margin: 10px 0 16px; }
-  table { border-collapse: collapse; margin: 6px 0; }
+  table { border-collapse: collapse; margin: 6px 0; width: 100%; }
   th, td { border: 1px solid #000; padding: 4px 12px; text-align: left; }
   th { background: #f0f0f0; }
   .evidencia { page-break-inside: avoid; margin: 8px 0 14px; }
@@ -124,10 +126,10 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
 <body>
   <div class="encabezado">
     ${logo ? `<img src="${logo}" /><br/>` : ''}
-    <div class="institucion">${escapar(plantilla.nombreInstitucion)}</div>
-    ${plantilla.nombreFacultad ? `<div class="facultad">${escapar(plantilla.nombreFacultad)}</div>` : ''}
+    <div class="institucion">${escapar(plantilla?.nombreInstitucion || 'UNIVERSIDAD NACIONAL TORIBIO RODRÍGUEZ DE MENDOZA')}</div>
+    ${plantilla?.nombreFacultad ? `<div class="facultad">${escapar(plantilla.nombreFacultad)}</div>` : ''}
   </div>
-  <p class="ano">"${escapar(plantilla.tituloAnoEncabezado)}"</p>
+  <p class="ano">"${escapar(plantilla?.tituloAnoEncabezado || '')}"</p>
 
   <h1>INFORME N° ${escapar(informe.numeroInforme)}</h1>
 
@@ -139,9 +141,9 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
   </table>
   <hr />
 
-  <p>Me dirijo a usted para saludarlo cordialmente y, a la vez, remitir el informe de resultados de
-  evaluación de la asignatura <b>"${escapar(informe.nombreCurso)}"</b>, correspondiente al semestre
-  académico ${escapar(informe.semestre)}.</p>
+  <p>Me dirijo a usted para saludarlo cordialmente y, a la vez, remitir el informe de resultados de evaluación de la asignatura <b>"${escapar(
+    informe.nombreCurso
+  )}"</b>, correspondiente al semestre académico ${escapar(informe.semestre)}.</p>
 
   <h2>I. DATOS GENERALES</h2>
   <p><b>Asignatura:</b> ${escapar(informe.nombreCurso)}<br/>
@@ -151,7 +153,11 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
 
   <h2>II. RESULTADOS DE LA EVALUACIÓN</h2>
   ${unidades.length ? unidades.map(tablaUnidad).join('') : '<p>No se registraron resultados.</p>'}
-  ${hayPlanMejora ? `<p class="alerta">Una o más unidades presentan un porcentaje de desaprobación igual o superior al ${LIMITE_PLAN_MEJORA} %. Corresponde formular un Plan de Mejora Académica (Art. 62° del Reglamento General de Evaluación).</p>` : ''}
+  ${
+    hayPlanMejora
+      ? `<p class="alerta">Una o más unidades presentan un porcentaje de desaprobación igual o superior al ${LIMITE_PLAN_MEJORA} %. Corresponde formular un Plan de Mejora Académica.</p>`
+      : ''
+  }
 
   <h2>III. EVIDENCIAS DE APRENDIZAJE</h2>
   ${htmlEvidencias || '<p>No se registraron evidencias para este curso.</p>'}
@@ -169,12 +175,10 @@ const construirHtmlClasico = async ({ informe, unidades, evidencias, plantilla }
 };
 
 /**
- * Genera el PDF en el celular y devuelve su ruta (file://...)
+ * Genera el PDF físicamente en la memoria temporal del móvil y retorna la URI
  */
 export const generarPdfInforme = async (datos: InformeCompleto): Promise<string> => {
   const html = await construirHtmlInforme(datos);
-  // En Expo Go, compartir no puede leer la carpeta donde expo-print deja el PDF
-  // ("Not allowed to read file"): se reescribe en la caché de la app
   const { base64 } = await Print.printToFileAsync({ html, base64: true });
   const nombre = `Informe-${datos.informe.numeroInforme.replace(/[^\w-]+/g, '_')}.pdf`;
   const pdf = new File(Paths.cache, nombre);
@@ -183,8 +187,7 @@ export const generarPdfInforme = async (datos: InformeCompleto): Promise<string>
 };
 
 /**
- * Abre la vista de impresión del sistema: en Android trae "Guardar como PDF"
- * para descargarlo en la carpeta que elija el docente
+ * Dispara la interfaz nativa de impresión ("Guardar como PDF" en Android)
  */
 export const descargarPdfInforme = async (datos: InformeCompleto): Promise<void> => {
   const html = await construirHtmlInforme(datos);
@@ -192,11 +195,15 @@ export const descargarPdfInforme = async (datos: InformeCompleto): Promise<void>
 };
 
 /**
- * Abre el menú de compartir (WhatsApp, Drive, correo...) con el PDF
+ * Invocación del menú nativo de compartir documento
  */
 export const compartirPdf = async (uri: string): Promise<void> => {
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error('Compartir no está disponible en este dispositivo.');
   }
-  await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: 'Compartir informe' });
+  await Sharing.shareAsync(uri, {
+    mimeType: 'application/pdf',
+    UTI: 'com.adobe.pdf',
+    dialogTitle: 'Compartir informe',
+  });
 };

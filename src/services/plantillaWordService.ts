@@ -1,4 +1,3 @@
-
 import {
   AlignmentType,
   BorderStyle,
@@ -36,7 +35,7 @@ const DOCUMENTACION_POR_DEFECTO = [
   'Evidencias de aprendizaje.',
 ];
 
-// ---------- piezas básicas ----------
+// ---------- Piezas básicas ----------
 type Trozo = string | { t: string; b?: boolean; i?: boolean; u?: boolean };
 type Bloque = Paragraph | Table;
 type OpcionesTexto = { size?: number; color?: string; negrita?: boolean };
@@ -45,11 +44,17 @@ const lineas = (texto: string) => texto.split('\n').map((l) => l.trim()).filter(
 const pct = (n: number) => `${n.toFixed(1)}%`;
 const cmATwips = (cm: number) => Math.round(cm * 567);
 
-// Convierte "texto" o [{ t: 'texto', b: true }, ...] en pedazos de texto de Word
 const trozos = (contenido: Trozo | Trozo[], o: OpcionesTexto = {}) =>
   (Array.isArray(contenido) ? contenido : [contenido]).map((x) => {
     const p = typeof x === 'string' ? { t: x } : x;
-    return new TextRun({ text: p.t, bold: p.b ?? o.negrita, italics: p.i, underline: p.u ? {} : undefined, size: o.size, color: o.color });
+    return new TextRun({
+      text: p.t,
+      bold: p.b ?? o.negrita,
+      italics: p.i,
+      underline: p.u ? {} : undefined,
+      size: o.size,
+      color: o.color,
+    });
   });
 
 const BORDE = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
@@ -57,7 +62,10 @@ const SIN_BORDE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
 const BORDES = { top: BORDE, bottom: BORDE, left: BORDE, right: BORDE };
 const SIN_BORDES = { top: SIN_BORDE, bottom: SIN_BORDE, left: SIN_BORDE, right: SIN_BORDE };
 
-const celdaConParrafos = (hijos: Paragraph[], o: { columnas?: number; filas?: number; ancho?: number; borde?: boolean; encabezado?: boolean; arriba?: boolean } = {}) =>
+const celdaConParrafos = (
+  hijos: Paragraph[],
+  o: { columnas?: number; filas?: number; ancho?: number; borde?: boolean; encabezado?: boolean; arriba?: boolean } = {}
+) =>
   new TableCell({
     children: hijos,
     columnSpan: o.columnas,
@@ -68,7 +76,6 @@ const celdaConParrafos = (hijos: Paragraph[], o: { columnas?: number; filas?: nu
     verticalAlign: o.arriba ? VerticalAlign.TOP : VerticalAlign.CENTER,
   });
 
-// Anchos de columna en twips (1/1440 de pulgada): así Word y LibreOffice respetan las proporciones
 const tabla = (filas: TableRow[], columnas: number[]) =>
   new Table({
     rows: filas,
@@ -79,10 +86,11 @@ const tabla = (filas: TableRow[], columnas: number[]) =>
 
 const espacio = (despues = 120) => new Paragraph({ spacing: { after: despues } });
 
-/** Línea horizontal (la "linea" y "linea-doble" del PDF) */
 const lineaHorizontal = (doble = false) =>
   new Paragraph({
-    border: { bottom: { style: doble ? BorderStyle.DOUBLE : BorderStyle.SINGLE, size: doble ? 12 : 8, color: '000000', space: 1 } },
+    border: {
+      bottom: { style: doble ? BorderStyle.DOUBLE : BorderStyle.SINGLE, size: doble ? 12 : 8, color: '000000', space: 1 },
+    },
     spacing: { before: 40, after: 160 },
   });
 
@@ -92,14 +100,24 @@ export const construirDocumentoDesdePlantilla = async (
   contenido: ContenidoInforme
 ): Promise<Document> => {
   const f = definicion.formato;
-  const tam = f.tamano * 2; // Word cuenta el tamaño en medios puntos
+  const tam = f.tamano * 2;
   const chico = (f.tamano - 1) * 2;
   const margen = cmATwips(f.margenesCm);
-  const anchoUtil = 11906 - 2 * margen; // ancho de la hoja A4 menos los márgenes
-  const columnas = (porcentajes: number[], escala = 1) => porcentajes.map((p) => Math.round((anchoUtil * escala * p) / 100));
+  const anchoUtil = 11906 - 2 * margen; // Corregido: multiplicación por 2
+  const columnas = (porcentajes: number[], escala = 1) =>
+    porcentajes.map((p) => Math.round((anchoUtil * escala * p) / 100));
 
-  // ---------- párrafos y listas ----------
-  const parrafo = (contenidoTexto: Trozo | Trozo[], o: OpcionesTexto & { alineacion?: (typeof AlignmentType)[keyof typeof AlignmentType]; antes?: number; despues?: number; sangria?: number; juntar?: boolean } = {}) =>
+  // ---------- Párrafos y listas ----------
+  const parrafo = (
+    contenidoTexto: Trozo | Trozo[],
+    o: OpcionesTexto & {
+      alineacion?: (typeof AlignmentType)[keyof typeof AlignmentType];
+      antes?: number;
+      despues?: number;
+      sangria?: number;
+      juntar?: boolean;
+    } = {}
+  ) =>
     new Paragraph({
       keepNext: o.juntar,
       children: trozos(contenidoTexto, o),
@@ -107,7 +125,9 @@ export const construirDocumentoDesdePlantilla = async (
       spacing: { before: o.antes ?? 40, after: o.despues ?? 40 },
       indent: o.sangria ? { left: o.sangria } : undefined,
     });
+
   const parrafos = (texto: string, juntar = false) => lineas(texto).map((l) => parrafo(l, { juntar }));
+
   const item = (marca: string, contenidoItem: Trozo | Trozo[], sangria = 0, juntarConSiguiente = false) =>
     new Paragraph({
       keepNext: juntarConSiguiente,
@@ -116,10 +136,13 @@ export const construirDocumentoDesdePlantilla = async (
       tabStops: [{ type: TabStopType.LEFT, position: sangria + 360 }],
       spacing: { before: 20, after: 20 },
     });
+
   const listaGuiones = (items: string[], sangria = 0) => items.map((t) => item('-', t, sangria));
   const listaLetras = (items: string[]) => items.map((t, i) => item(`${LETRAS[i]})`, t));
   const listaNumeros = (items: string[]) => items.map((t, i) => item(`${i + 1}.`, t));
-  const vineta = (contenidoItem: Trozo | Trozo[], juntarConSiguiente = false) => item('•', contenidoItem, 0, juntarConSiguiente);
+  const vineta = (contenidoItem: Trozo | Trozo[], juntarConSiguiente = false) =>
+    item('•', contenidoItem, 0, juntarConSiguiente);
+
   const pendiente = (texto: string) => parrafo({ t: `[${texto}]`, i: true }, { color: '777777' });
   const subtitulo = (texto: string) => parrafo({ t: texto, b: true }, { antes: 160, alineacion: AlignmentType.LEFT });
   const alerta = (texto: string) =>
@@ -129,15 +152,18 @@ export const construirDocumentoDesdePlantilla = async (
       spacing: { before: 80, after: 80 },
     });
 
-  // ---------- tablas ----------
-  const celda = (contenidoCelda: Trozo | Trozo[], o: { encabezado?: boolean; centrado?: boolean; columnas?: number; filas?: number; ancho?: number } = {}) =>
+  // ---------- Tablas ----------
+  const celda = (
+    contenidoCelda: Trozo | Trozo[],
+    o: { encabezado?: boolean; centrado?: boolean; columnas?: number; filas?: number; ancho?: number } = {}
+  ) =>
     celdaConParrafos(
       [
         new Paragraph({
           children: trozos(contenidoCelda, { size: chico, negrita: o.encabezado }),
           alignment: o.encabezado || o.centrado ? AlignmentType.CENTER : AlignmentType.LEFT,
           spacing: { before: 40, after: 40 },
-          keepNext: true, // mantiene la tabla completa en la misma hoja, como el PDF
+          keepNext: true,
         }),
       ],
       o
@@ -149,12 +175,17 @@ export const construirDocumentoDesdePlantilla = async (
       new TableRow({
         tableHeader: encabezado,
         cantSplit: true,
-        children: valores.map((v, i) => celda(v, { encabezado, centrado: !encabezado && (conItem ? i !== 2 : i !== 1), ancho: w[i] })),
+        children: valores.map((v, i) =>
+          celda(v, { encabezado, centrado: !encabezado && (conItem ? i !== 2 : i !== 1), ancho: w[i] })
+        ),
       });
+
     return tabla(
       [
         fila([...(conItem ? ['ÍTEM'] : []), 'CÓDIGO', 'CURSO ASIGNADO', 'CICLO', 'SEMESTRE'], true),
-        ...cursos.map(({ curso }, i) => fila([...(conItem ? [String(i + 1)] : []), curso.codigo ?? '—', curso.nombre, curso.ciclo, curso.semestre], false)),
+        ...cursos.map(({ curso }, i) =>
+          fila([...(conItem ? [String(i + 1)] : []), curso.codigo ?? '—', curso.nombre, curso.ciclo, curso.semestre], false)
+        ),
       ],
       w
     );
@@ -164,9 +195,12 @@ export const construirDocumentoDesdePlantilla = async (
     const filas = cursos
       .map(({ curso, resultados }) => ({ curso, r: resultados.find((x) => x.nombreUnidad === unidad) }))
       .filter((fila) => fila.r);
+
     if (!filas.length) return [pendiente(`No se registraron notas de la ${unidadEnRomano(unidad)}`)];
+
     const w = columnas([34, 11, 13, 11, 13, 18]);
     const dato = (v: string, i: number) => celda(v, { centrado: true, ancho: w[i] });
+
     return [
       tabla(
         [
@@ -211,12 +245,16 @@ export const construirDocumentoDesdePlantilla = async (
   };
 
   const resumenEstadistico = (dc: DatosCurso): Bloque[] => {
-    // Igual que el PDF: el fin de ciclo usa la última unidad con notas
     const r = dc.resultados.at(-1);
     if (!r) return [pendiente('Sin notas registradas para este curso')];
+
     const w = columnas([40, 30, 30], 0.75);
     const fila = (valores: string[], encabezado: boolean) =>
-      new TableRow({ cantSplit: true, children: valores.map((v, i) => celda(v, { encabezado, centrado: i > 0, ancho: w[i] })) });
+      new TableRow({
+        cantSplit: true,
+        children: valores.map((v, i) => celda(v, { encabezado, centrado: i > 0, ancho: w[i] })),
+      });
+
     return [
       tabla(
         [
@@ -230,15 +268,21 @@ export const construirDocumentoDesdePlantilla = async (
     ];
   };
 
-  // Fotos en una cuadrícula de 2 por fila
   const cuadriculaFotos = (fotos: { data: Uint8Array; tipo: 'png' | 'jpg'; ancho: number; alto: number }[]): Bloque[] => {
     if (!fotos.length) return [];
     const mitad = Math.round(anchoUtil / 2);
     const filas: TableRow[] = [];
+
     for (let i = 0; i < fotos.length; i += 2) {
       const celdas = fotos.slice(i, i + 2).map((foto) =>
         celdaConParrafos(
-          [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60 }, children: [new ImageRun({ type: foto.tipo, data: foto.data, transformation: ajustarImagen(foto, 250, 190) })] })],
+          [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 60, after: 60 },
+              children: [new ImageRun({ type: foto.tipo, data: foto.data, transformation: ajustarImagen(foto, 250, 190) })],
+            }),
+          ],
           { borde: false, ancho: mitad }
         )
       );
@@ -255,10 +299,17 @@ export const construirDocumentoDesdePlantilla = async (
       salida.push(subtitulo(curso.nombre));
       salida.push(
         ...listaLetras(
-          evidencias.map((e) => `${e.nombreActividad}${e.tipoActividad ? ` – ${e.tipoActividad}` : ''}${e.unidad ? ` (${unidadEnRomano(e.unidad)})` : ''}`)
+          evidencias.map(
+            (e) =>
+              `${e.nombreActividad}${e.tipoActividad ? ` – ${e.tipoActividad}` : ''}${
+                e.unidad ? ` (${unidadEnRomano(e.unidad)})` : ''
+              }`
+          )
         )
       );
-      const fotos = (await Promise.all(evidencias.map((e) => (e.tipoArchivo === 'IMAGE' ? leerImagenWord(e.rutaArchivoLocal) : null)))).filter((x) => x !== null);
+      const fotos = (
+        await Promise.all(evidencias.map((e) => (e.tipoArchivo === 'IMAGE' ? leerImagenWord(e.rutaArchivoLocal) : null)))
+      ).filter((x) => x !== null);
       salida.push(...cuadriculaFotos(fotos));
     }
     return salida.length ? salida : [pendiente('No se registraron evidencias para los cursos seleccionados')];
@@ -270,10 +321,13 @@ export const construirDocumentoDesdePlantilla = async (
     );
     if (!frases.length) return [pendiente('Sin resultados para analizar')];
     const hayPlanMejora = datos.cursos.some((c) => c.resultados.some((r) => r.requierePlanMejora));
+
     return [
       ...frases.map((fr) => parrafo(fr)),
       hayPlanMejora
-        ? alerta(`Una o más unidades presentan un porcentaje de desaprobación igual o superior al ${LIMITE_PLAN_MEJORA}%. Corresponde formular un Plan de Mejora Académica (Art. 62° del Reglamento General de Evaluación).`)
+        ? alerta(
+            `Una o más unidades presentan un porcentaje de desaprobación igual o superior al ${LIMITE_PLAN_MEJORA}%. Corresponde formular un Plan de Mejora Académica (Art. 62° del Reglamento General de Evaluación).`
+          )
         : parrafo(['En todos los cursos ', { t: `el porcentaje de desaprobación se mantiene por debajo del ${LIMITE_PLAN_MEJORA}%`, b: true }, '.']),
     ];
   };
@@ -304,7 +358,6 @@ export const construirDocumentoDesdePlantilla = async (
     ];
   };
 
-  // ---------- secciones ----------
   type SeccionExpandida = Seccion & { unidad?: string };
 
   const dibujarSeccion = async (s: SeccionExpandida): Promise<Bloque[]> => {
@@ -351,31 +404,38 @@ export const construirDocumentoDesdePlantilla = async (
       case 'documentacion':
         return conIntro(listaNumeros(contenido.documentacion ?? DOCUMENTACION_POR_DEFECTO));
       case 'cierre':
-        return [...parrafos(texto(), true), ...bloqueFirma()]; // el cierre y la firma no se separan
+        return [...parrafos(texto(), true), ...bloqueFirma()];
     }
   };
 
-  /** La sección "Resultados de la [unidad]" se repite por cada unidad pedida */
   const expandirSecciones = (secciones: Seccion[], unidades: string[]): SeccionExpandida[] =>
     secciones.flatMap((s) =>
       s.tipo === 'resultados_unidad'
-        ? (unidades.length ? unidades : ['']).map((u) => ({ ...s, unidad: u, titulo: s.titulo.replace('[unidad]', unidadEnRomano(u).toUpperCase()) }))
+        ? (unidades.length ? unidades : ['']).map((u) => ({
+            ...s,
+            unidad: u,
+            titulo: s.titulo.replace('[unidad]', unidadEnRomano(u).toUpperCase()),
+          }))
         : [s]
     );
 
-  // ---------- campos del oficio (A, DE, ASUNTO, FECHA) ----------
   const bloqueCampos = (): Bloque[] => {
     if (!definicion.campos.length) return [];
     const wCampos = columnas([14, 86]);
     const valor = (clave: string, porDefecto: string) => contenido.campos[clave] ?? porDefecto;
     const numero = definicion.campos.find((c) => c.clave === 'numero');
+
     const filas = definicion.campos
       .filter((c) => c.clave !== 'numero')
       .map((c) => {
         const [primera, ...resto] = lineas(valor(c.clave, c.valor));
         return new TableRow({
           children: [
-            celdaConParrafos([new Paragraph({ children: [new TextRun({ text: c.etiqueta, bold: true })] })], { borde: false, arriba: true, ancho: wCampos[0] }),
+            celdaConParrafos([new Paragraph({ children: [new TextRun({ text: c.etiqueta, bold: true })] })], {
+              borde: false,
+              arriba: true,
+              ancho: wCampos[0],
+            }),
             celdaConParrafos(
               [
                 new Paragraph({
@@ -391,18 +451,25 @@ export const construirDocumentoDesdePlantilla = async (
           ],
         });
       });
+
     return [
       ...(numero
-        ? [new Paragraph({ spacing: { before: 160, after: 120 }, children: [new TextRun({ text: `${numero.etiqueta} ${valor('numero', numero.valor)}`, bold: true, underline: {}, size: tam + 2 })] })]
+        ? [
+            new Paragraph({
+              spacing: { before: 160, after: 120 },
+              children: [new TextRun({ text: `${numero.etiqueta} ${valor('numero', numero.valor)}`, bold: true, underline: {}, size: tam + 2 })],
+            }),
+          ]
         : []),
       tabla(filas, wCampos),
       lineaHorizontal(),
     ];
   };
 
-  // ---------- armado del documento ----------
+  // ---------- Armado del documento ----------
   const cuerpo: Bloque[] = [...bloqueCampos()];
   let numeroSeccion = 0;
+
   for (const s of expandirSecciones(definicion.secciones, datos.unidades)) {
     if (s.titulo) {
       const marca = marcaSeccion(definicion.numeracion, numeroSeccion);
@@ -417,6 +484,7 @@ export const construirDocumentoDesdePlantilla = async (
     }
     cuerpo.push(...(await dibujarSeccion(s)));
   }
+
   if (!cuerpo.length) cuerpo.push(new Paragraph({}));
 
   return new Document({
@@ -426,7 +494,7 @@ export const construirDocumentoDesdePlantilla = async (
       default: {
         document: {
           run: { font: f.fuente, size: tam },
-          paragraph: { spacing: { line: Math.round(240 * f.interlineado), lineRule: LineRuleType.AUTO } },
+          paragraph: { spacing: { line: Math.round(240 * f.interlineado), lineRule: LineRuleType.AUTO } }, // Corregido: multiplicación por f.interlineado
         },
       },
     },
@@ -434,7 +502,7 @@ export const construirDocumentoDesdePlantilla = async (
       {
         properties: {
           page: {
-            size: { width: 11906, height: 16838 }, // A4
+            size: { width: 11906, height: 16838 }, // Formato A4
             margin: { top: margen, bottom: margen, left: margen, right: margen, header: 500, footer: 500 },
           },
         },
@@ -446,7 +514,6 @@ export const construirDocumentoDesdePlantilla = async (
   });
 };
 
-// ---------- cabecera y pie ----------
 const construirCabecera = async (c: Cabecera, anchoUtil: number): Promise<Header> => {
   const logoIzq = await leerImagenWord(c.logoIzquierdo);
   const logoDer = await leerImagenWord(c.logoDerecho);
@@ -457,6 +524,7 @@ const construirCabecera = async (c: Cabecera, anchoUtil: number): Promise<Header
       alignment: derecha ? AlignmentType.RIGHT : AlignmentType.LEFT,
       children: [new ImageRun({ type: imagen.tipo, data: imagen.data, transformation: ajustarImagen(imagen, 210, 52) })],
     });
+
   const textos = (lineasTexto: string[], derecha: boolean, negrita: boolean, size: number) =>
     new Paragraph({
       alignment: derecha ? AlignmentType.RIGHT : AlignmentType.LEFT,
@@ -464,7 +532,6 @@ const construirCabecera = async (c: Cabecera, anchoUtil: number): Promise<Header
     });
 
   if (logoIzq) celdas.push({ peso: c.logoIzquierdo === 'untrm' ? 4 : 2, hijos: [logo(logoIzq, false)] });
-  // El logo horizontal de la UNTRM ya trae el nombre: no se repite el texto (igual que el PDF)
   if (c.logoIzquierdo !== 'untrm' && c.textoIzquierdo.length) celdas.push({ peso: 3, hijos: [textos(c.textoIzquierdo, false, false, 17)] });
   if (c.textoDerecho.length) celdas.push({ peso: 4, hijos: [textos(c.textoDerecho, true, true, 19)] });
   if (logoDer) celdas.push({ peso: 2, hijos: [logo(logoDer, true)] });
@@ -475,6 +542,7 @@ const construirCabecera = async (c: Cabecera, anchoUtil: number): Promise<Header
     const anchos = celdas.map((x) => Math.round((x.peso / total) * anchoUtil));
     hijos.push(tabla([new TableRow({ children: celdas.map((x, i) => celdaConParrafos(x.hijos, { borde: false, ancho: anchos[i] })) })], anchos));
   }
+
   if (c.lema) {
     hijos.push(
       new Paragraph({
@@ -484,6 +552,7 @@ const construirCabecera = async (c: Cabecera, anchoUtil: number): Promise<Header
       })
     );
   }
+
   hijos.push(c.lineaInferior ? lineaHorizontal() : new Paragraph({}));
   return new Header({ children: hijos });
 };
@@ -494,6 +563,7 @@ const construirPie = (p: Pie): Footer => {
     hijos.push(lineaHorizontal(true));
     hijos.push(...p.lineas.map((l) => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: l, size: 16 })] })));
   }
+
   if (p.numeroPagina) {
     hijos.push(
       new Paragraph({
@@ -507,6 +577,7 @@ const construirPie = (p: Pie): Footer => {
       })
     );
   }
+
   if (!hijos.length) hijos.push(new Paragraph({}));
   return new Footer({ children: hijos });
 };

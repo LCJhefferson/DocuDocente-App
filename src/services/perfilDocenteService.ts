@@ -1,76 +1,102 @@
-// src/services/perfilDocenteService.ts
-// Gestión de datos personales y académicos del docente en SQLite
-
 import { eq } from 'drizzle-orm';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 import { db } from '../database/client';
 import { perfilesDocente } from '../database/schema';
 import { EntradaPerfilDocente, PerfilDocente } from '../models/PerfilDocente';
 
-export class PerfilDocenteService {
+export const perfilDocenteService = {
   /**
-   * Crea la ficha académica del docente asignando valores institucionales por defecto
+   * Crea la ficha académica inicial del docente asignando UUID nativo y valores por defecto
    */
-  static async crearPerfil(entrada: EntradaPerfilDocente): Promise<PerfilDocente> {
-    const perfilId = uuidv4();
-    const ahora = new Date().toISOString();
+  async crearPerfil(entrada: EntradaPerfilDocente): Promise<PerfilDocente> {
+    try {
+      const perfilId = Crypto.randomUUID();
+      const ahora = new Date().toISOString();
 
-    await db.insert(perfilesDocente).values({
-      id: perfilId,
-      cuentaId: entrada.cuentaId,
-      nombreCompleto: entrada.nombreCompleto,
-      gradoAcademico: entrada.gradoAcademico || 'Mg.',
-      facultad: 'Facultad de Ingeniería de Sistemas y Mecánica Eléctrica', // <-- Satisface la restricción NOT NULL de la BD existente
-      departamento: '',
-      codigoInstitucional: '',
-      creadoEn: ahora,
-      actualizadoEn: ahora,
-    });
+      const nuevoPerfil = {
+        id: perfilId,
+        cuentaId: entrada.cuentaId,
+        nombreCompleto: entrada.nombreCompleto.trim(),
+        gradoAcademico: entrada.gradoAcademico?.trim() || 'Mg.',
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      };
 
-    return {
-      id: perfilId,
-      cuentaId: entrada.cuentaId,
-      nombreCompleto: entrada.nombreCompleto,
-      gradoAcademico: entrada.gradoAcademico || 'Mg.',
-    };
-  }
+      await db.insert(perfilesDocente).values(nuevoPerfil);
 
-  /**
-   * Consulta el perfil docente por el ID de la cuenta activa
-   */
-  static async obtenerPorCuentaId(cuentaId: string): Promise<PerfilDocente | null> {
-    const resultados = await db
-      .select()
-      .from(perfilesDocente)
-      .where(eq(perfilesDocente.cuentaId, cuentaId));
-
-    if (resultados.length === 0) return null;
-
-    const perfil = resultados[0];
-    return {
-      id: perfil.id,
-      cuentaId: perfil.cuentaId,
-      nombreCompleto: perfil.nombreCompleto,
-      gradoAcademico: perfil.gradoAcademico,
-    };
-  }
+      return {
+        id: nuevoPerfil.id,
+        cuentaId: nuevoPerfil.cuentaId,
+        nombreCompleto: nuevoPerfil.nombreCompleto,
+        gradoAcademico: nuevoPerfil.gradoAcademico,
+        creadoEn: nuevoPerfil.creadoEn,
+        actualizadoEn: nuevoPerfil.actualizadoEn,
+      };
+    } catch (error) {
+      console.error('[perfilDocenteService.crearPerfil Error]:', error);
+      throw error;
+    }
+  },
 
   /**
-   * Actualiza la información del perfil docente ligado a una cuenta
+   * Consulta el perfil docente mediante el ID de la cuenta con sesión activa
    */
-  static async actualizarPerfil(
+  async obtenerPorCuentaId(cuentaId: string): Promise<PerfilDocente | null> {
+    try {
+      if (!cuentaId) return null;
+
+      const [perfil] = await db
+        .select()
+        .from(perfilesDocente)
+        .where(eq(perfilesDocente.cuentaId, cuentaId));
+
+      if (!perfil) return null;
+
+      return {
+        id: perfil.id,
+        cuentaId: perfil.cuentaId,
+        nombreCompleto: perfil.nombreCompleto,
+        gradoAcademico: perfil.gradoAcademico,
+        creadoEn: perfil.creadoEn,
+        actualizadoEn: perfil.actualizadoEn,
+      };
+    } catch (error) {
+      console.error('[perfilDocenteService.obtenerPorCuentaId Error]:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualiza la información personal/académica del docente vinculada a su cuenta
+   */
+  async actualizarPerfil(
     cuentaId: string,
     datos: Partial<Omit<PerfilDocente, 'id' | 'cuentaId'>>
   ): Promise<void> {
-    const ahora = new Date().toISOString();
+    try {
+      const ahora = new Date().toISOString();
 
-    await db
-      .update(perfilesDocente)
-      .set({
-        ...datos,
-        actualizadoEn: ahora,
-      })
-      .where(eq(perfilesDocente.cuentaId, cuentaId));
-  }
+      await db
+        .update(perfilesDocente)
+        .set({
+          ...(datos.nombreCompleto && { nombreCompleto: datos.nombreCompleto.trim() }),
+          ...(datos.gradoAcademico && { gradoAcademico: datos.gradoAcademico.trim() }),
+          actualizadoEn: ahora,
+        })
+        .where(eq(perfilesDocente.cuentaId, cuentaId));
+    } catch (error) {
+      console.error('[perfilDocenteService.actualizarPerfil Error]:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Clase estática de compatibilidad para evitar romper importaciones existentes que usen
+ * `PerfilDocenteService.obtenerPorCuentaId()`
+ */
+export class PerfilDocenteService {
+  static crearPerfil = perfilDocenteService.crearPerfil;
+  static obtenerPorCuentaId = perfilDocenteService.obtenerPorCuentaId;
+  static actualizarPerfil = perfilDocenteService.actualizarPerfil;
 }

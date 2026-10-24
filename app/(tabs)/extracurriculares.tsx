@@ -1,28 +1,64 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
 import { useAuth } from '../../src/context/AuthContext';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
-const UNIDADES = ['Unidad 1', 'Unidad 2', 'Unidad 3'];
+// Tipado estricto para las evidencias extracurriculares
+interface EvidenciaExtracurricular {
+  id: string;
+  nombreActividad: string;
+  descripcion?: string | null;
+  tipoActividad?: string | null;
+  unidad?: string | null;
+  rutaArchivoLocal?: string | null;
+  urlRemota?: string | null;
+  creadoEn: string;
+}
+
+const UNIDADES = ['Todas', 'Unidad 1', 'Unidad 2', 'Unidad 3'];
 
 export default function ExtracurricularesScreen() {
-  const { perfilDocente, cerrarSesion } = useAuth();
-  const [actividades, setActividades] = useState<any[]>([]);
-  const [busqueda, setBusqueda] = useState('');
-  const [unidadActiva, setUnidadActiva] = useState<string>('Unidad 1');
-  const [modalVisible, setModalVisible] = useState(false);
+  const { perfilDocente, cuentaId, cerrarSesion } = useAuth();
 
-  const cargarActividades = async () => {
-    const resultado = await evidenciaService.obtenerExtracurriculares();
-    setActividades(resultado);
-  };
+  const [actividades, setActividades] = useState<EvidenciaExtracurricular[]>([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [unidadActiva, setUnidadActiva] = useState<string>('Todas');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
+  const [cargando, setCargando] = useState(true);
+
+  // Identificador único del docente activo
+  const idDocenteActivo = perfilDocente?.id || cuentaId;
+
+  const cargarActividades = useCallback(async () => {
+    if (!idDocenteActivo) return;
+    try {
+      setCargando(true);
+      const resultado = await evidenciaService.obtenerExtracurriculares(idDocenteActivo);
+      setActividades(resultado as EvidenciaExtracurricular[]);
+    } catch (error) {
+      console.error('[Extracurriculares] Error al cargar actividades:', error);
+    } finally {
+      setCargando(false);
+    }
+  }, [idDocenteActivo]);
 
   useEffect(() => {
     cargarActividades();
-  }, []);
+  }, [cargarActividades]);
 
   const manejarGuardar = async (datos: {
     nombreActividad: string;
@@ -30,19 +66,27 @@ export default function ExtracurricularesScreen() {
     tipoActividad: string;
     archivo: { uri: string; name: string; type?: string } | null;
   }) => {
+    if (!idDocenteActivo) {
+      Alert.alert('Error', 'No se encontró la sesión del docente activo.');
+      return;
+    }
+
     try {
       await evidenciaService.crearEvidencia({
+        perfilDocenteId: idDocenteActivo,
         tipoGeneral: 'EXTRACURRICULAR',
+        cursoId: undefined, // Explícitamente no asignado a curso
         nombreActividad: datos.nombreActividad,
         descripcion: datos.descripcion,
-        unidad: unidadActiva, // <-- Asigna la unidad actualmente seleccionada
+        unidad: unidadActiva === 'Todas' ? 'General' : unidadActiva,
         tipoActividad: datos.tipoActividad,
         rutaArchivoLocal: datos.archivo?.uri,
         tipoArchivo: datos.archivo?.type === 'application/pdf' ? 'PDF' : 'IMAGE',
       });
+
       cargarActividades();
     } catch (error) {
-      Alert.alert('Error', 'No se pudo guardar la actividad.');
+      Alert.alert('Error', 'No se pudo guardar la actividad extracurricular.');
     }
   };
 
@@ -53,7 +97,7 @@ export default function ExtracurricularesScreen() {
     ]);
   };
 
-  const manejarEliminar = (actividad: any) => {
+  const manejarEliminar = (actividad: EvidenciaExtracurricular) => {
     Alert.alert('Eliminar actividad', `¿Eliminar "${actividad.nombreActividad}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -61,7 +105,7 @@ export default function ExtracurricularesScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await evidenciaService.eliminarEvidencia(actividad.id);
+            await evidenciaService.eliminarEvidencia(actividad.id, perfilDocente?.id);
             cargarActividades();
           } catch (error) {
             Alert.alert('Error', 'No se pudo eliminar la actividad.');
@@ -71,25 +115,21 @@ export default function ExtracurricularesScreen() {
     ]);
   };
 
-  // Filtrado por Búsqueda y por Unidad Seleccionada
+  // Filtrado optimizado por búsqueda y unidad activa
   const actividadesFiltradas = actividades.filter((a) => {
     const coincideBusqueda = a.nombreActividad?.toLowerCase().includes(busqueda.toLowerCase());
-    // Si la actividad no tiene unidad registrada (datos antiguos), se muestra en Unidad 1 por defecto
-    const coincideUnidad = a.unidad ? a.unidad === unidadActiva : unidadActiva === 'Unidad 1';
+    const coincideUnidad =
+      unidadActiva === 'Todas' || !a.unidad || a.unidad === unidadActiva;
     return coincideBusqueda && coincideUnidad;
   });
 
   return (
     <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-      {/* Encabezado */}
+      {/* Encabezado Superior */}
       <View style={styles.encabezado}>
         <Text style={styles.titulo}>Extracurriculares</Text>
         <View style={styles.iconosEncabezado}>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)
-            }
-          >
+          <TouchableOpacity onPress={() => setModalPerfilVisible(true)}>
             <Ionicons name="person-outline" size={24} color="#1C252C" />
           </TouchableOpacity>
           <TouchableOpacity onPress={manejarCerrarSesion}>
@@ -98,7 +138,7 @@ export default function ExtracurricularesScreen() {
         </View>
       </View>
 
-      {/* Selector de Unidades (Chips) */}
+      {/* Selector de Unidades */}
       <View style={styles.contenedorUnidades}>
         {UNIDADES.map((unidad) => {
           const esActiva = unidadActiva === unidad;
@@ -121,14 +161,14 @@ export default function ExtracurricularesScreen() {
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
         <TextInput
           style={styles.inputBuscador}
-          placeholder="Buscar evidencia"
+          placeholder="Buscar actividad extracurricular"
           placeholderTextColor="#94A3B8"
           value={busqueda}
           onChangeText={setBusqueda}
         />
       </View>
 
-      {/* Botón Añadir Evidencia */}
+      {/* Botón Agregar Evidencia */}
       <View style={styles.contenedorBotonAgregar}>
         <TouchableOpacity style={styles.botonAgregar} onPress={() => setModalVisible(true)}>
           <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
@@ -136,38 +176,55 @@ export default function ExtracurricularesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Evidencias de la Unidad */}
-      <FlatList
-        data={actividadesFiltradas}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.lista}
-        ListEmptyComponent={
-          <View style={styles.contenedorVacio}>
-            <Ionicons name="folder-open-outline" size={56} color="#94A3B8" style={{ marginBottom: 12 }} />
-            <Text style={styles.textoVacio}>No hay evidencias registradas en esta unidad.</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.tarjeta}>
-            <View style={styles.info}>
-              <Text style={styles.nombre}>{item.nombreActividad}</Text>
-              {item.tipoActividad ? <Text style={styles.tipo}>{item.tipoActividad}</Text> : null}
-              <Text style={styles.fecha}>{new Date(item.creadoEn).toLocaleDateString('es-ES')}</Text>
+      {/* Lista de Evidencias */}
+      {cargando ? (
+        <View style={styles.contenedorVacio}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      ) : (
+        <FlatList
+          data={actividadesFiltradas}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.lista}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.contenedorVacio}>
+              <Ionicons name="folder-open-outline" size={56} color="#94A3B8" style={{ marginBottom: 12 }} />
+              <Text style={styles.textoVacio}>No hay actividades registradas.</Text>
             </View>
-            <TouchableOpacity style={styles.botonEliminar} onPress={() => manejarEliminar(item)}>
-              <Ionicons name="trash-outline" size={20} color="#0F172A" />
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.tarjeta}>
+              <View style={styles.info}>
+                <Text style={styles.nombre}>{item.nombreActividad}</Text>
+                {item.tipoActividad ? <Text style={styles.tipo}>{item.tipoActividad}</Text> : null}
+                <Text style={styles.fecha}>
+                  {new Date(item.creadoEn).toLocaleDateString('es-ES')} · {item.unidad || 'General'}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.botonEliminar} onPress={() => manejarEliminar(item)}>
+                <Ionicons name="trash-outline" size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
 
+      {/* Modal Subir Evidencia */}
       <ModalSubirEvidencia
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         titulo={`Actividad Extracurricular - ${unidadActiva}`}
-        subtitulo="Registra actividades que no son clases"
-        tipos={['Charla', 'Campaña', 'Salida', 'Otro']}
+        subtitulo="Registra actividades complementarias (charlas, talleres, salidas)"
+        tipos={['Charla', 'Campaña', 'Salida', 'Taller', 'Otro']}
         onGuardar={manejarGuardar}
+      />
+
+      {/* Modal Perfil Docente y Configuración */}
+      <ModalPerfilDocente
+        visible={modalPerfilVisible}
+        onClose={() => setModalPerfilVisible(false)}
+        onSincronizacionCompletada={cargarActividades}
       />
     </SafeAreaView>
   );
@@ -184,8 +241,6 @@ const styles = StyleSheet.create({
   },
   titulo: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
   iconosEncabezado: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-
-  // Estilos del Selector de Unidades
   contenedorUnidades: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -209,7 +264,6 @@ const styles = StyleSheet.create({
   textoChipUnidadActivo: {
     color: '#0369A1',
   },
-
   contenedorBuscador: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,7 +287,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   textoBotonAgregar: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  lista: { paddingHorizontal: 16 },
+  lista: { paddingHorizontal: 16, paddingBottom: 20 },
   tarjeta: {
     backgroundColor: '#BAE6FD',
     borderRadius: 20,

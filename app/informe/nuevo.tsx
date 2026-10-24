@@ -12,7 +12,7 @@ import { CursoService } from '../../src/services/cursoService';
 import { DatosInforme, informeDatosService } from '../../src/services/informeDatosService';
 import { InformeService } from '../../src/services/informeService';
 import { plantillaService } from '../../src/services/plantillaService';
-import { reemplazarMarcadores, unidadEnRomano } from '../../src/utils/informeTexto';
+import { reemplazarMarcadores } from '../../src/utils/informeTexto';
 
 type Opcion = { id: string; plantillaId: string | null; nombre: string; definicion: DefinicionPlantilla };
 
@@ -43,7 +43,6 @@ export default function NuevoInformeScreen() {
   const opcion = opciones.find((o) => o.id === opcionId) ?? null;
   const tiposEnPlantilla = useMemo(() => new Set(opcion?.definicion.secciones.map((s) => s.tipo)), [opcion]);
 
-  // Plantillas del docente (la predeterminada primero) + las del catálogo
   useEffect(() => {
     if (!perfilDocente) return;
     (async () => {
@@ -66,7 +65,6 @@ export default function NuevoInformeScreen() {
     })().catch((e) => console.error('[NuevoInforme] Error al cargar:', e));
   }, [perfilDocente]);
 
-  // Reúne los datos cada vez que cambian los cursos o las unidades
   useEffect(() => {
     if (!perfilDocente) return;
     informeDatosService
@@ -75,7 +73,6 @@ export default function NuevoInformeScreen() {
       .catch((e) => console.error('[NuevoInforme] Error al reunir datos:', e));
   }, [perfilDocente, cursoIds, unidades]);
 
-  // Autocompleta campos y textos al elegir plantilla (todo queda editable)
   useEffect(() => {
     if (!opcion || !datos) return;
     const valores = datos.valores;
@@ -87,7 +84,7 @@ export default function NuevoInformeScreen() {
           : c.clave === 'fecha'
             ? datos.fecha
             : c.clave === 'de'
-              ? `${valores.docente}\nDocente de la Facultad de ${datos.docente.facultad}`
+              ? `${valores.docente}\nDocente de la Universidad`
               : c.clave === 'a'
                 ? anterior?.contenido.campos.a ?? c.valor
                 : reemplazarMarcadores(c.valor, valores);
@@ -95,7 +92,6 @@ export default function NuevoInformeScreen() {
     setCampos(autocompletado);
     const apertura = opcion.definicion.secciones.find((s) => s.tipo === 'apertura')?.texto;
     setTextos({ apertura: apertura ? reemplazarMarcadores(apertura, valores) : undefined });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opcionId, datos?.valores.unidades, datos?.valores.semestre, anterior]);
 
   const alternar = (lista: string[], valor: string) => (lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor]);
@@ -162,7 +158,7 @@ export default function NuevoInformeScreen() {
 
       <ScrollView contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
         {/* 1. PLANTILLA */}
-        <Text style={styles.seccion}>1. Plantilla</Text>
+        <Text style={styles.seccion}>1. Selecciona Plantilla</Text>
         {opciones.map((o) => (
           <TouchableOpacity key={o.id} style={[styles.opcion, o.id === opcionId && styles.opcionActiva]} onPress={() => setOpcionId(o.id)}>
             <Ionicons name={o.id === opcionId ? 'radio-button-on' : 'radio-button-off'} size={18} color={o.id === opcionId ? '#1E88E5' : '#94A3B8'} />
@@ -171,7 +167,7 @@ export default function NuevoInformeScreen() {
         ))}
 
         {/* 2. CURSOS Y UNIDADES */}
-        <Text style={styles.seccion}>2. Cursos y unidades</Text>
+        <Text style={styles.seccion}>2. Cursos y Unidades</Text>
         {cursos.length === 0 && <Text style={styles.ayuda}>Aún no tienes cursos registrados.</Text>}
         {cursos.map((c) => {
           const elegido = cursoIds.includes(c.id);
@@ -181,77 +177,87 @@ export default function NuevoInformeScreen() {
               <Ionicons name={elegido ? 'checkbox' : 'square-outline'} size={18} color={elegido ? '#1E88E5' : '#94A3B8'} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.textoOpcion}>{c.nombre}</Text>
-                {elegido && sinNotas && <Text style={styles.aviso}>Sin notas guardadas en las unidades elegidas</Text>}
+                {elegido && sinNotas && <Text style={styles.avisoNotas}>Sin notas registradas para la unidad elegida.</Text>}
               </View>
             </TouchableOpacity>
           );
         })}
-        <View style={styles.fila}>
-          {UNIDADES_INFORME.map((u) => (
-            <TouchableOpacity key={u} style={[styles.chip, unidades.includes(u) && styles.chipActivo]} onPress={() => setUnidades((l) => alternar(l, u))}>
-              <Text style={[styles.textoChip, unidades.includes(u) && styles.textoChipActivo]}>{unidadEnRomano(u)}</Text>
-            </TouchableOpacity>
-          ))}
+
+        <Text style={[styles.subseccion, { marginTop: 12 }]}>Unidades a incluir:</Text>
+        <View style={styles.unidadesFila}>
+          {UNIDADES_INFORME.map((u) => {
+            const activa = unidades.includes(u);
+            return (
+              <TouchableOpacity key={u} style={[styles.chipUnidad, activa && styles.chipUnidadActivo]} onPress={() => setUnidades((l) => alternar(l, u))}>
+                <Text style={[styles.textoChip, activa && styles.textoChipActivo]}>{u}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* 3. DATOS DEL OFICIO */}
-        <View style={styles.filaTitulo}>
-          <Text style={styles.seccion}>3. Datos del oficio</Text>
-          {anterior && (
-            <TouchableOpacity onPress={usarAnterior}>
-              <Text style={styles.enlace}>Usar los del informe anterior</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* BOTÓN AUTOCOMPLETADO ANTERIOR */}
+        {anterior && (
+          <TouchableOpacity style={styles.botonAnterior} onPress={usarAnterior}>
+            <Ionicons name="refresh-circle-outline" size={20} color="#1E88E5" />
+            <Text style={styles.textoBotonAnterior}>Cargar datos del último informe</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 3. ENCABEZADO Y CAMPOS DE LA PLANTILLA */}
+        <Text style={styles.seccion}>3. Datos del Encabezado</Text>
         {opcion.definicion.campos.map((c) => (
-          <View key={c.clave} style={styles.campo}>
+          <View key={c.clave} style={styles.campoGrupo}>
             <Text style={styles.etiqueta}>{c.etiqueta}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, c.clave === 'a' || c.clave === 'de' ? { height: 70 } : null]}
+              multiline={c.clave === 'a' || c.clave === 'de'}
               value={campos[c.clave] ?? ''}
-              onChangeText={(v) => setCampos((actual) => ({ ...actual, [c.clave]: v }))}
-              multiline={c.clave === 'a' || c.clave === 'de' || c.clave === 'ref' || c.clave === 'asunto'}
-              placeholder={c.clave === 'a' ? 'Nombre\nCargo' : ''}
-              placeholderTextColor="#94A3B8"
+              onChangeText={(t) => setCampos((prev) => ({ ...prev, [c.clave]: t }))}
             />
           </View>
         ))}
 
-        {/* 4. TEXTOS */}
-        <Text style={styles.seccion}>4. Textos del informe</Text>
-        {TEXTOS_LIBRES.filter((t) => tiposEnPlantilla.has(t.tipo)).map((t) => (
-          <View key={t.tipo} style={styles.campo}>
-            <Text style={styles.etiqueta}>{t.etiqueta}</Text>
-            {t.ayuda ? <Text style={styles.ayuda}>{t.ayuda}</Text> : null}
+        {/* 4. TEXTOS Y SECCIONES DINÁMICAS */}
+        <Text style={styles.seccion}>4. Secciones del Informe</Text>
+        {TEXTOS_LIBRES.filter((t) => tiposEnPlantilla.has(t.tipo)).map((item) => (
+          <View key={item.tipo} style={styles.campoGrupo}>
+            <Text style={styles.etiqueta}>{item.etiqueta}</Text>
+            {item.ayuda ? <Text style={styles.ayuda}>{item.ayuda}</Text> : null}
             <TextInput
-              style={[styles.input, styles.inputLargo]}
-              value={textos[t.tipo] ?? ''}
-              onChangeText={(v) => setTextos((actual) => ({ ...actual, [t.tipo]: v }))}
+              style={[styles.input, { height: 90 }]}
               multiline
+              value={textos[item.tipo] ?? ''}
+              onChangeText={(t) => setTextos((prev) => ({ ...prev, [item.tipo]: t }))}
             />
           </View>
         ))}
-        {tiposEnPlantilla.has('actividades_por_curso') &&
-          cursos
-            .filter((c) => cursoIds.includes(c.id))
-            .map((c) => (
-              <View key={c.id} style={styles.campo}>
-                <Text style={styles.etiqueta}>Metodología · {c.nombre}</Text>
-                <Text style={styles.ayuda}>Un punto por línea.</Text>
-                <TextInput
-                  style={[styles.input, styles.inputLargo]}
-                  value={metodologias[c.id] ?? ''}
-                  onChangeText={(v) => setMetodologias((actual) => ({ ...actual, [c.id]: v }))}
-                  multiline
-                />
-              </View>
-            ))}
-        <Text style={styles.ayuda}>
-          Las tablas de cursos, resultados, evidencias, análisis y otras actividades se llenan solas con tus datos.
-        </Text>
 
-        <TouchableOpacity style={[styles.boton, guardando && { opacity: 0.6 }]} onPress={generar} disabled={guardando || !datos}>
-          {guardando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.textoBoton}>Generar informe</Text>}
+        {/* METODOLOGÍAS POR CURSO */}
+        {tiposEnPlantilla.has('actividades_por_curso') &&
+          datos?.cursos.map(({ curso }) => (
+            <View key={curso.id} style={styles.campoGrupo}>
+              <Text style={styles.etiqueta}>Metodología: {curso.nombre}</Text>
+              <TextInput
+                style={[styles.input, { height: 70 }]}
+                multiline
+                placeholder="Ej. Clases magistrales, aprendizaje basado en problemas..."
+                placeholderTextColor="#94A3B8"
+                value={metodologias[curso.id] ?? ''}
+                onChangeText={(t) => setMetodologias((prev) => ({ ...prev, [curso.id]: t }))}
+              />
+            </View>
+          ))}
+
+        {/* BOTÓN GENERAR INFORME */}
+        <TouchableOpacity style={styles.botonGuardar} onPress={generar} disabled={guardando}>
+          {guardando ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.textoBotonGuardar}>Generar e ir a vista previa</Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -260,26 +266,65 @@ export default function NuevoInformeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 50 },
   titulo: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
-  contenido: { padding: 16, paddingBottom: 48 },
-  seccion: { fontSize: 15, fontWeight: '700', color: '#124874', marginTop: 20, marginBottom: 8 },
-  filaTitulo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  enlace: { fontSize: 13, fontWeight: '600', color: '#1E88E5', marginTop: 12 },
-  opcion: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 8 },
+  contenido: { padding: 16, paddingBottom: 40 },
+  seccion: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginTop: 18, marginBottom: 10 },
+  subseccion: { fontSize: 14, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  opcion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+  },
   opcionActiva: { borderColor: '#1E88E5', backgroundColor: '#EFF6FF' },
-  textoOpcion: { fontSize: 14, color: '#0F172A', flexShrink: 1 },
-  aviso: { fontSize: 12, color: '#B45309', marginTop: 2 },
-  fila: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#CBD5E1' },
-  chipActivo: { backgroundColor: '#1E88E5', borderColor: '#1E88E5' },
-  textoChip: { fontSize: 13, color: '#475569', fontWeight: '600' },
+  textoOpcion: { fontSize: 14, color: '#0F172A', fontWeight: '500' },
+  avisoNotas: { fontSize: 12, color: '#D97706', marginTop: 2 },
+  unidadesFila: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  chipUnidad: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F1F5F9' },
+  chipUnidadActivo: { backgroundColor: '#1E88E5' },
+  textoChip: { fontSize: 13, color: '#64748B', fontWeight: '600' },
   textoChipActivo: { color: '#FFFFFF' },
-  campo: { marginBottom: 12 },
-  etiqueta: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 4 },
-  ayuda: { fontSize: 12, color: '#94A3B8', marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#0F172A' },
-  inputLargo: { minHeight: 90, textAlignVertical: 'top' },
-  boton: { backgroundColor: '#1E88E5', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  textoBoton: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  botonAnterior: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginVertical: 10,
+  },
+  textoBotonAnterior: { fontSize: 13, color: '#0284C7', fontWeight: '600' },
+  campoGrupo: { marginBottom: 12 },
+  etiqueta: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 },
+  ayuda: { fontSize: 12, color: '#64748B', marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#0F172A',
+    backgroundColor: '#FFFFFF',
+  },
+  botonGuardar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E88E5',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginTop: 20,
+    gap: 8,
+  },
+  textoBotonGuardar: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

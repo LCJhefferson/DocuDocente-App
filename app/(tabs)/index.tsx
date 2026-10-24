@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CursoCard } from '../../src/components/cursos/CursoCard';
 import { ModalCrearCurso } from '../../src/components/modals/ModalCrearCurso';
 import { ModalOpcionesCurso } from '../../src/components/modals/ModalOpcionesCurso';
+import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
 import { useAuth } from '../../src/context/AuthContext';
 import { Curso } from '../../src/models/Curso';
 import { CursoService } from '../../src/services/cursoService';
@@ -32,19 +33,18 @@ export default function CursosScreen() {
   // Modales
   const [modalCrearVisible, setModalCrearVisible] = useState(false);
   const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
+  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
   const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
   const cargarCursos = useCallback(async () => {
     try {
       setCargando(true);
-      // Usar perfilDocente?.id o recurrir al id sembrado si no hay sesión
       const docenteId = perfilDocente?.id || 'perfil_default';
       const data = await CursoService.obtenerCursosPorDocente(docenteId, busqueda);
       setCursosList(data);
     } catch (error) {
       console.error('Error al cargar cursos:', error);
     } finally {
-      // Garantiza que la pantalla deje de cargar siempre
       setCargando(false);
     }
   }, [busqueda, perfilDocente]);
@@ -52,6 +52,13 @@ export default function CursosScreen() {
   useEffect(() => {
     cargarCursos();
   }, [cargarCursos]);
+
+  // Recargar cursos automáticamente cuando la pantalla gane foco en Expo Router
+  useFocusEffect(
+    useCallback(() => {
+      cargarCursos();
+    }, [cargarCursos])
+  );
 
   const manejarCrearCurso = async (datos: {
     nombre: string;
@@ -93,11 +100,11 @@ export default function CursosScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await CursoService.eliminarCurso(curso.id);
+              await CursoService.eliminarCurso(curso.id, perfilDocente?.id);
               setModalOpcionesVisible(false);
               setCursoSeleccionado(null);
               cargarCursos();
-              Alert.alert('Eliminado', 'El curso se ha eliminado correctamente.');
+              Alert.alert('Eliminado', 'El curso y sus evidencias se han eliminado correctamente.');
             } catch (error: any) {
               Alert.alert('Error', error.message || 'No se pudo eliminar el curso.');
             }
@@ -136,7 +143,7 @@ export default function CursosScreen() {
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
-          onPress={() => Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)}
+          onPress={() => setModalPerfilVisible(true)}
         >
           <Ionicons name="person-outline" size={24} color="#1C252C" />
         </TouchableOpacity>
@@ -203,6 +210,13 @@ export default function CursosScreen() {
           )}
         />
       )}
+
+      {/* MODAL PERFIL Y CONFIGURACIÓN */}
+      <ModalPerfilDocente
+        visible={modalPerfilVisible}
+        onClose={() => setModalPerfilVisible(false)}
+        onSincronizacionCompletada={cargarCursos}
+      />
 
       {/* MODAL CREAR CURSO */}
       <ModalCrearCurso

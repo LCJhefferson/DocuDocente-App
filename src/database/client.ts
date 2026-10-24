@@ -16,6 +16,7 @@ export const db = drizzle(expoDb, { schema });
 export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
   try {
     expoDb.execSync(`
+      DROP TABLE IF EXISTS eliminaciones_pendientes;
       DROP TABLE IF EXISTS evidencias;
       DROP TABLE IF EXISTS actividades;
       DROP TABLE IF EXISTS resultados_unidad;
@@ -42,7 +43,6 @@ const migrarPerfilesDocente = () => {
       .map((c) => c.name);
 
     if (columnas.includes('facultad')) {
-      // Como perfiles_docente tiene referencias en otras tablas, desactivamos temporales foreign keys para recrearla
       expoDb.execSync(`
         PRAGMA foreign_keys = OFF;
         DROP TABLE IF EXISTS perfiles_docente;
@@ -113,6 +113,26 @@ const migrarPlantillas = () => {
   const columnasInformes = expoDb.getAllSync<{ name: string }>('PRAGMA table_info(informes);').map((c) => c.name);
   if (!columnasInformes.includes('contenido')) {
     expoDb.execSync('ALTER TABLE informes ADD COLUMN contenido TEXT;');
+  }
+};
+
+/**
+ * Detecta si la tabla evidencias no posee la columna perfil_docente_id y la agrega dinámicamente
+ */
+const migrarEvidencias = () => {
+  try {
+    const columnas = expoDb
+      .getAllSync<{ name: string }>('PRAGMA table_info(evidencias);')
+      .map((c) => c.name);
+
+    if (!columnas.includes('perfil_docente_id')) {
+      expoDb.execSync(
+        `ALTER TABLE evidencias ADD COLUMN perfil_docente_id TEXT REFERENCES perfiles_docente(id) ON DELETE CASCADE;`
+      );
+      console.log('[DB Migración Evidencias] Columna perfil_docente_id agregada con éxito.');
+    }
+  } catch (e) {
+    console.log('[DB Migración Evidencias] No se requirió migración o la tabla aún no existe.');
   }
 };
 
@@ -212,6 +232,7 @@ export const initDatabase = async (): Promise<void> => {
 
       CREATE TABLE IF NOT EXISTS evidencias (
         id TEXT PRIMARY KEY NOT NULL,
+        perfil_docente_id TEXT REFERENCES perfiles_docente(id) ON DELETE CASCADE,
         tipo_general TEXT NOT NULL DEFAULT 'ACADEMICA',
         curso_id TEXT REFERENCES cursos(id) ON DELETE CASCADE,
         actividad_id TEXT REFERENCES actividades(id) ON DELETE CASCADE,
@@ -226,12 +247,22 @@ export const initDatabase = async (): Promise<void> => {
         creado_en TEXT NOT NULL,
         actualizado_en TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS eliminaciones_pendientes (
+        id TEXT PRIMARY KEY NOT NULL,
+        tabla TEXT NOT NULL,
+        registro_id TEXT NOT NULL,
+        storage_path TEXT,
+        creado_en TEXT NOT NULL
+      );
     `);
 
+    // 3. Ejecución de migraciones sobre bases de datos existentes
     migrarResultadosUnidad();
     migrarPlantillas();
+    migrarEvidencias();
 
-    // AUTO-SIEMBRA SIMPLIFICADA
+    // 4. Auto-siembra simplificada
     const perfiles = expoDb.getAllSync('SELECT id FROM perfiles_docente LIMIT 1;');
     if (perfiles.length === 0) {
       const ahora = new Date().toISOString();

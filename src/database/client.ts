@@ -16,6 +16,7 @@ export const db = drizzle(expoDb, { schema });
 export const dropAndRecreateDatabaseDev = async (): Promise<void> => {
   try {
     expoDb.execSync(`
+      DROP TABLE IF EXISTS eliminaciones_pendientes;
       DROP TABLE IF EXISTS evidencias;
       DROP TABLE IF EXISTS actividades;
       DROP TABLE IF EXISTS resultados_unidad;
@@ -245,6 +246,14 @@ export const initDatabase = async (): Promise<void> => {
         leyenda TEXT,
         creado_en TEXT NOT NULL,
         actualizado_en TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS eliminaciones_pendientes (
+        id TEXT PRIMARY KEY NOT NULL,
+        tabla TEXT NOT NULL,
+        registro_id TEXT NOT NULL,
+        storage_path TEXT,
+        creado_en TEXT NOT NULL
       );
     `);
 

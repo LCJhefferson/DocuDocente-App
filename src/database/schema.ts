@@ -19,11 +19,10 @@ export const perfilesDocente = sqliteTable('perfiles_docente', {
     .notNull()
     .unique(),
   nombreCompleto: text('nombre_completo').notNull(),
-  gradoAcademico: text('grado_academico').default('Mg.').notNull(), // SE CONSERVA
+  gradoAcademico: text('grado_academico').default('Mg.').notNull(),
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
 });
-
 
 // 3. PLANTILLAS DE ENCABEZADO
 export const plantillas = sqliteTable('plantillas', {
@@ -109,7 +108,7 @@ export const evidencias = sqliteTable('evidencias', {
   actividadId: text('actividad_id').references(() => actividades.id, { onDelete: 'cascade' }),
   nombreActividad: text('nombre_actividad').notNull(),
   descripcion: text('descripcion'),
-  unidad: text('unidad'), 
+  unidad: text('unidad'),
   tipoActividad: text('tipo_actividad'),
   rutaArchivoLocal: text('ruta_archivo_local'),
   urlRemota: text('url_remota'),
@@ -117,4 +116,13 @@ export const evidencias = sqliteTable('evidencias', {
   leyenda: text('leyenda'),
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
+});
+
+// 9. COLA DE ELIMINACIONES PENDIENTES (Soporte Offline-First)
+export const eliminacionesPendientes = sqliteTable('eliminaciones_pendientes', {
+  id: text('id').primaryKey(),
+  tabla: text('tabla').notNull(), // 'evidencias' | 'cursos'
+  registroId: text('registro_id').notNull(), // ID del registro borrado
+  storagePath: text('storage_path'), // Ruta en Supabase Storage (si requiere borrar archivo)
+  creadoEn: text('creado_en').notNull(),
 });

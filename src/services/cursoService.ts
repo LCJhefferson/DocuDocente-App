@@ -1,8 +1,10 @@
 import { and, desc, eq, like } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system/legacy';
 import { db } from '../database/client';
-import { cursos } from '../database/schema';
+import { cursos, eliminacionesPendientes, evidencias } from '../database/schema';
 import { Curso, EntradaCrearCurso } from '../models/Curso';
+import { supabase } from './supabase/client';
 
 export interface EntradaActualizarCurso {
   nombre: string;
@@ -132,11 +134,84 @@ export const cursoService = {
   },
 
   /**
-   * Elimina un curso por su ID
+   * ELIMINACIÓN EN CASCADA (Curso + Evidencias asociadas + Archivos locales + Supabase Cloud)
    */
-  async eliminarCurso(cursoId: string): Promise<void> {
+  async eliminarCurso(cursoId: string, docenteId?: string): Promise<void> {
     try {
+      // 1. Obtener todas las evidencias vinculadas a este curso
+      const evidenciasDelCurso = await db
+        .select()
+        .from(evidencias)
+        .where(eq(evidencias.cursoId, cursoId));
+
+      const pathsStorageABorrar: string[] = [];
+
+      // 2. Borrar las imágenes físicas guardadas localmente en el dispositivo
+      for (const ev of evidenciasDelCurso) {
+        if (ev.rutaArchivoLocal) {
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(ev.rutaArchivoLocal);
+            if (fileInfo.exists) {
+              await FileSystem.deleteAsync(ev.rutaArchivoLocal, { idempotent: true });
+            }
+          } catch (e) {
+            console.warn('[eliminarCurso] No se pudo borrar el archivo físico local:', e);
+          }
+        }
+
+        const idDocente = docenteId || ev.perfilDocenteId;
+        if (idDocente) {
+          pathsStorageABorrar.push(`evidencias/${idDocente}/${ev.id}.jpg`);
+        }
+      }
+
+      // 3. Borrar evidencias vinculadas de SQLite local
+      await db.delete(evidencias).where(eq(evidencias.cursoId, cursoId));
+
+      // 4. Borrar el curso de SQLite local
       await db.delete(cursos).where(eq(cursos.id, cursoId));
+
+      // 5. Intentar eliminar en Supabase Cloud
+      try {
+        // Borrar imágenes de Supabase Storage en lote
+        if (pathsStorageABorrar.length > 0) {
+          await supabase.storage.from('evidencias-imagenes').remove(pathsStorageABorrar);
+        }
+
+        // Borrar evidencias de Supabase DB
+        await supabase.from('evidencias').delete().eq('curso_id', cursoId);
+
+        // Borrar curso de Supabase DB
+        const { error } = await supabase.from('cursos').delete().eq('id', cursoId);
+        if (error) throw error;
+      } catch (cloudError) {
+        console.warn('[eliminarCurso] Sin conexión remota. Guardando tareas en cola offline.');
+
+        const ahora = new Date().toISOString();
+
+        // Encolar borrado del curso para la sincronización
+        await db.insert(eliminacionesPendientes).values({
+          id: Crypto.randomUUID(),
+          tabla: 'cursos',
+          registroId: cursoId,
+          storagePath: null,
+          creadoEn: ahora,
+        });
+
+        // Encolar borrado de cada evidencia del curso
+        for (const ev of evidenciasDelCurso) {
+          const idDocente = docenteId || ev.perfilDocenteId;
+          const path = idDocente ? `evidencias/${idDocente}/${ev.id}.jpg` : null;
+
+          await db.insert(eliminacionesPendientes).values({
+            id: Crypto.randomUUID(),
+            tabla: 'evidencias',
+            registroId: ev.id,
+            storagePath: path,
+            creadoEn: ahora,
+          });
+        }
+      }
     } catch (error) {
       console.error('[cursoService.eliminarCurso Error]:', error);
       throw error;

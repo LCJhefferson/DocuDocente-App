@@ -1,10 +1,9 @@
 import { decode } from 'base64-arraybuffer';
 import { eq, or } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
-// Importación Legacy para garantizar compatibilidad con Expo Go Android/iOS
 import * as FileSystem from 'expo-file-system/legacy';
 import { db } from '../../database/client';
-import { cursos, evidencias } from '../../database/schema';
+import { cursos, eliminacionesPendientes, evidencias } from '../../database/schema';
 import { supabase } from './client';
 
 export interface ResultadoSincronizacion {
@@ -12,9 +11,10 @@ export interface ResultadoSincronizacion {
   cursosDescargados: number;
   evidenciasSubidas: number;
   evidenciasDescargadas: number;
+  eliminacionesProcesadas: number;
 }
 
-// Regex estricto para validar UUID v4
+// Regex estricto para validar UUID v4 de PostgreSQL
 const REGEX_UUID_VALIDO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[0-89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
@@ -65,15 +65,12 @@ async function descargarImagenALocal(urlRemota: string, evidenciaId: string): Pr
 
     const folderPath = `${FileSystem.documentDirectory}evidencias/`;
 
-    // Crear la carpeta física en el dispositivo si aún no existe
     const folderInfo = await FileSystem.getInfoAsync(folderPath);
     if (!folderInfo.exists) {
       await FileSystem.makeDirectoryAsync(folderPath, { intermediates: true });
     }
 
     const localTargetUri = `${folderPath}${evidenciaId}.jpg`;
-
-    // Descargar el archivo binario
     const downloadResult = await FileSystem.downloadAsync(urlRemota, localTargetUri);
 
     if (downloadResult.status === 200) {
@@ -88,6 +85,38 @@ async function descargarImagenALocal(urlRemota: string, evidenciaId: string): Pr
 
 export const syncService = {
   /**
+   * Procesa la cola de eliminaciones pendientes (Cursos y Evidencias) acumuladas durante el modo offline
+   */
+  async procesarEliminacionesPendientes(): Promise<number> {
+    let procesadas = 0;
+    try {
+      const cola = await db.select().from(eliminacionesPendientes);
+
+      for (const item of cola) {
+        // 1. Borrar archivo de Storage si aplica
+        if (item.storagePath) {
+          await supabase.storage.from('evidencias-imagenes').remove([item.storagePath]);
+        }
+
+        // 2. Borrar registro de la tabla en Supabase ('cursos' o 'evidencias')
+        const { error } = await supabase
+          .from(item.tabla)
+          .delete()
+          .eq('id', item.registroId);
+
+        // Si se completó o el registro ya no existía en la nube, borramos de la cola local
+        if (!error) {
+          await db.delete(eliminacionesPendientes).where(eq(eliminacionesPendientes.id, item.id));
+          procesadas++;
+        }
+      }
+    } catch (error) {
+      console.error('[procesarEliminacionesPendientes Error]:', error);
+    }
+    return procesadas;
+  },
+
+  /**
    * Sincronización Bidireccional de Cursos, Evidencias e Imágenes físicas entre SQLite local y Supabase
    */
   async sincronizarTodo(cuentaId: string, perfilDocenteId?: string): Promise<ResultadoSincronizacion> {
@@ -96,10 +125,16 @@ export const syncService = {
       cursosDescargados: 0,
       evidenciasSubidas: 0,
       evidenciasDescargadas: 0,
+      eliminacionesProcesadas: 0,
     };
 
     if (!cuentaId) return res;
     const idPerfilLocal = perfilDocenteId || cuentaId;
+
+    // ==========================================
+    // 0. PROCESAR COLA DE ELIMINACIONES PENDIENTES
+    // ==========================================
+    res.eliminacionesProcesadas = await this.procesarEliminacionesPendientes();
 
     // ==========================================
     // 1. SINCRONIZAR CURSOS (SUBIDA Y EDICIÓN)
@@ -258,7 +293,6 @@ export const syncService = {
         if (!existe) {
           let rutaLocal: string | null = null;
 
-          // Si la evidencia en la nube tiene imagen, la descargamos al almacenamiento físico del teléfono
           if (rev.url_publica) {
             rutaLocal = await descargarImagenALocal(rev.url_publica, rev.id);
           }
@@ -273,7 +307,7 @@ export const syncService = {
             descripcion: rev.descripcion || null,
             unidad: rev.unidad || null,
             tipoActividad: rev.tipo_actividad || null,
-            rutaArchivoLocal: rutaLocal, // Guarda la ruta local descargada
+            rutaArchivoLocal: rutaLocal,
             urlRemota: rev.url_publica || null,
             tipoArchivo: rev.tipo_archivo || 'IMAGE',
             leyenda: rev.leyenda || null,

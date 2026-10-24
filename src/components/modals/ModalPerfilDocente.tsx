@@ -19,7 +19,7 @@ import { syncService } from '../../services/supabase/syncService';
 interface ModalPerfilDocenteProps {
   visible: boolean;
   onClose: () => void;
-  onSincronizacionCompletada?: () => void; // Prop agregada para recargar datos en caliente
+  onSincronizacionCompletada?: () => void;
 }
 
 export const ModalPerfilDocente: React.FC<ModalPerfilDocenteProps> = ({
@@ -70,14 +70,14 @@ export const ModalPerfilDocente: React.FC<ModalPerfilDocenteProps> = ({
       const docenteIdLocal = perfilDocente?.id || cuentaId;
       const res = await syncService.sincronizarTodo(cuentaId, docenteIdLocal);
 
-      // Notificar a la pantalla invocadora para recargar el listado de SQLite
+      // Notificar a la pantalla invocadora para recargar la lista local de SQLite
       if (onSincronizacionCompletada) {
         onSincronizacionCompletada();
       }
 
       Alert.alert(
         'Sincronización Completa',
-        `Subidos a Supabase:\n• Cursos: ${res.cursosSubidos}\n• Evidencias: ${res.evidenciasSubidas}\n\nDescargados a Local:\n• Cursos: ${res.cursosDescargados}\n• Evidencias: ${res.evidenciasDescargadas}`
+        `Subidos a Supabase:\n• Cursos: ${res.cursosSubidos}\n• Evidencias: ${res.evidenciasSubidas}\n\nDescargados a Local:\n• Cursos: ${res.cursosDescargados}\n• Evidencias: ${res.evidenciasDescargadas}\n\nEliminaciones procesadas: ${res.eliminacionesProcesadas}`
       );
     } catch (error: any) {
       Alert.alert('Error de Sincronización', error.message || 'No se pudo sincronizar con Supabase.');
@@ -99,6 +99,9 @@ export const ModalPerfilDocente: React.FC<ModalPerfilDocenteProps> = ({
             try {
               await dropAndRecreateDatabaseDev();
               await recargarPerfil();
+              if (onSincronizacionCompletada) {
+                onSincronizacionCompletada();
+              }
               Alert.alert('Base de Datos Restablecida', 'La base de datos local se ha reiniciado correctamente.');
               onClose();
             } catch (error: any) {
@@ -128,72 +131,106 @@ export const ModalPerfilDocente: React.FC<ModalPerfilDocenteProps> = ({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.contenedorModal}>
+          {/* ENCABEZADO */}
           <View style={styles.encabezado}>
-            <Text style={styles.titulo}>Mi Perfil y Configuración</Text>
+            <View style={styles.iconoPerfilBadge}>
+              <Ionicons name="person" size={20} color="#0284C7" />
+            </View>
+            <View style={styles.tituloContenedor}>
+              <Text style={styles.titulo}>Mi Perfil</Text>
+              <Text style={styles.subtitulo}>Ajustes de cuenta y sincronización</Text>
+            </View>
             <TouchableOpacity onPress={onClose} style={styles.botonCerrar}>
-              <Ionicons name="close" size={24} color="#0F172A" />
+              <Ionicons name="close" size={22} color="#64748B" />
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-            <Text style={styles.subtituloSeccion}>Datos Docentes</Text>
+            {/* SECCIÓN 1: DATOS DOCENTES */}
+            <View style={styles.seccionCard}>
+              <Text style={styles.subtituloSeccion}>Información Personal</Text>
 
-            <Text style={styles.etiqueta}>Nombre Completo *</Text>
-            <TextInput
-              style={styles.input}
-              value={nombreCompleto}
-              onChangeText={setNombreCompleto}
-              placeholder="Ej: Dr. Juan Pérez"
-              placeholderTextColor="#94A3B8"
-            />
+              <Text style={styles.etiqueta}>Nombre Completo *</Text>
+              <TextInput
+                style={styles.input}
+                value={nombreCompleto}
+                onChangeText={setNombreCompleto}
+                placeholder="Ej: Dr. Juan Pérez"
+                placeholderTextColor="#94A3B8"
+              />
 
-            <Text style={styles.etiqueta}>Grado Académico</Text>
-            <TextInput
-              style={styles.input}
-              value={gradoAcademico}
-              onChangeText={setGradoAcademico}
-              placeholder="Mg. / Dr. / Ing."
-              placeholderTextColor="#94A3B8"
-            />
+              <Text style={styles.etiqueta}>Grado Académico</Text>
+              <TextInput
+                style={styles.input}
+                value={gradoAcademico}
+                onChangeText={setGradoAcademico}
+                placeholder="Mg. / Dr. / Ing."
+                placeholderTextColor="#94A3B8"
+              />
 
-            <TouchableOpacity style={styles.botonGuardar} onPress={guardarCambios} disabled={cargando}>
-              {cargando ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.textoBotonGuardar}>Guardar Cambios</Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botonGuardar}
+                onPress={guardarCambios}
+                disabled={cargando}
+                activeOpacity={0.85}
+              >
+                {cargando ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.textoBotonGuardar}>Guardar Cambios</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.separador} />
-
-            <Text style={styles.subtituloSeccion}>Mantenimiento de Datos</Text>
-
-            <TouchableOpacity
-              style={styles.botonSincronizar}
-              onPress={manejarSincronizacion}
-              disabled={sincronizando}
-            >
-              {sincronizando ? (
-                <ActivityIndicator color="#0369A1" />
-              ) : (
-                <Ionicons name="cloud-download-outline" size={20} color="#0369A1" />
-              )}
-              <Text style={styles.textoBotonSincronizar}>
-                {sincronizando ? 'Sincronizando todo...' : 'Sincronizar / Descargar de Supabase'}
+            {/* SECCIÓN 2: SINCRONIZACIÓN Y NUBE */}
+            <View style={styles.seccionCard}>
+              <Text style={styles.subtituloSeccion}>Sincronización de Datos</Text>
+              <Text style={styles.descripcionSeccion}>
+                Respalda o descarga tus cursos y evidencias en la nube de Supabase.
               </Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity style={styles.botonRestablecer} onPress={manejarRestablecerBD}>
-              <Ionicons name="refresh-outline" size={20} color="#B45309" />
-              <Text style={styles.textoBotonRestablecer}>Restablecer BD Local (Dev)</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botonSincronizar}
+                onPress={manejarSincronizacion}
+                disabled={sincronizando}
+                activeOpacity={0.85}
+              >
+                {sincronizando ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Ionicons name="cloud-download-outline" size={18} color="#FFFFFF" />
+                )}
+                <Text style={styles.textoBotonSincronizar}>
+                  {sincronizando ? 'Sincronizando todo...' : 'Sincronizar con Supabase'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.separador} />
+            {/* SECCIÓN 3: MANTENIMIENTO Y CUENTA */}
+            <View style={styles.seccionCard}>
+              <Text style={styles.subtituloSeccion}>Mantenimiento y Cuenta</Text>
 
-            <TouchableOpacity style={styles.botonCerrarSesion} onPress={manejarCerrarSesion}>
-              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-              <Text style={styles.textoCerrarSesion}>Cerrar Sesión</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botonRestablecer}
+                onPress={manejarRestablecerBD}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="refresh-circle-outline" size={20} color="#D97706" />
+                <Text style={styles.textoBotonRestablecer}>Restablecer BD Local (Dev)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.botonCerrarSesion}
+                onPress={manejarCerrarSesion}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+                <Text style={styles.textoCerrarSesion}>Cerrar Sesión</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -204,120 +241,153 @@ export const ModalPerfilDocente: React.FC<ModalPerfilDocenteProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'flex-end',
   },
   contenedorModal: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
-    paddingHorizontal: 20,
+    maxHeight: '88%',
+    paddingHorizontal: 18,
     paddingTop: 16,
     paddingBottom: 24,
   },
   encabezado: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  iconoPerfilBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tituloContenedor: {
+    flex: 1,
+  },
   titulo: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
   },
+  subtitulo: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
   botonCerrar: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
   },
   scroll: {
     paddingBottom: 12,
   },
+  seccionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
   subtituloSeccion: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#475569',
-    marginBottom: 10,
-    marginTop: 4,
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  descripcionSeccion: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+    lineHeight: 16,
   },
   etiqueta: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#334155',
     marginBottom: 4,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     fontSize: 14,
     color: '#0F172A',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   botonGuardar: {
-    backgroundColor: '#1E88E5',
-    borderRadius: 10,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    paddingVertical: 11,
     marginTop: 4,
   },
   textoBotonGuardar: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
-  },
-  separador: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 16,
+    fontSize: 13,
   },
   botonSincronizar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#0284C7',
     borderRadius: 10,
-    paddingVertical: 12,
-    marginBottom: 10,
+    paddingVertical: 11,
   },
   textoBotonSincronizar: {
-    color: '#0369A1',
-    fontWeight: '600',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
   },
   botonRestablecer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.2,
+    borderColor: '#FCD34D',
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
   },
   textoBotonRestablecer: {
-    color: '#B45309',
-    fontWeight: '600',
-    fontSize: 14,
+    color: '#D97706',
+    fontWeight: '700',
+    fontSize: 13,
   },
   botonCerrarSesion: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.2,
+    borderColor: '#FECACA',
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   textoCerrarSesion: {
     color: '#DC2626',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
 });

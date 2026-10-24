@@ -1,3 +1,4 @@
+// app/curso/[id].tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -15,7 +16,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
 import { useAuth } from '../../src/context/AuthContext';
-import { dropAndRecreateDatabaseDev } from '../../src/database/client';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
 interface EvidenciaDB {
@@ -96,25 +96,11 @@ export default function EvidenciasCursoScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await evidenciaService.eliminarEvidencia(evidenciaId);
+            await evidenciaService.eliminarEvidencia(evidenciaId, perfilDocente?.id);
             cargarEvidenciasBD();
           } catch (error) {
             Alert.alert('Error', 'No se pudo eliminar la evidencia.');
           }
-        },
-      },
-    ]);
-  };
-
-  const handleResetearDB = () => {
-    Alert.alert('Resetear DB', '¿Deseas recrear las tablas de SQLite?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Reiniciar',
-        style: 'destructive',
-        onPress: async () => {
-          await dropAndRecreateDatabaseDev();
-          cargarEvidenciasBD();
         },
       },
     ]);
@@ -126,6 +112,7 @@ export default function EvidenciasCursoScreen() {
 
   return (
     <SafeAreaView style={styles.contenedorPadre} edges={['top', 'left', 'right']}>
+      {/* ENCABEZADO SUPERIOR LIMPIO */}
       <View style={styles.headerSuperior}>
         <TouchableOpacity style={styles.botonVolver} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
@@ -134,14 +121,9 @@ export default function EvidenciasCursoScreen() {
         <Text style={styles.tituloHeader} numberOfLines={1}>
           {nombre || 'Nombre del curso'}
         </Text>
-
-        <View style={styles.headerAcciones}>
-          <TouchableOpacity style={styles.botonIconoHeader} onPress={handleResetearDB}>
-            <Ionicons name="refresh-outline" size={22} color="#0F172A" />
-          </TouchableOpacity>
-        </View>
       </View>
 
+      {/* SECTOR DE UNIDADES */}
       <View style={styles.contenedorUnidades}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollUnidades}>
           {UNIDADES.map((unidad) => {
@@ -161,6 +143,7 @@ export default function EvidenciasCursoScreen() {
         </ScrollView>
       </View>
 
+      {/* BUSCADOR */}
       <View style={styles.contenedorBuscador}>
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
         <TextInput
@@ -172,6 +155,7 @@ export default function EvidenciasCursoScreen() {
         />
       </View>
 
+      {/* BOTONES DE ACCIÓN */}
       <View style={styles.contenedorBotonesAccion}>
         <TouchableOpacity
           style={styles.botonNotas}
@@ -192,6 +176,7 @@ export default function EvidenciasCursoScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* LISTADO DE EVIDENCIAS */}
       {cargando ? (
         <View style={styles.vacioContenedor}>
           <ActivityIndicator size="large" color="#3B82F6" />
@@ -247,8 +232,6 @@ const styles = StyleSheet.create({
   headerSuperior: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   botonVolver: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#38BDF8', justifyContent: 'center', alignItems: 'center' },
   tituloHeader: { flex: 1, fontSize: 20, fontWeight: '700', color: '#0F172A', marginLeft: 12 },
-  headerAcciones: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  botonIconoHeader: { padding: 4 },
   contenedorUnidades: { marginTop: 8, marginBottom: 16 },
   scrollUnidades: { paddingHorizontal: 16, gap: 12 },
   pillUnidad: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9' },

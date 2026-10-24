@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -53,6 +53,13 @@ export default function CursosScreen() {
     cargarCursos();
   }, [cargarCursos]);
 
+  // Recargar cursos automáticamente cuando la pantalla gane foco en Expo Router
+  useFocusEffect(
+    useCallback(() => {
+      cargarCursos();
+    }, [cargarCursos])
+  );
+
   const manejarCrearCurso = async (datos: {
     nombre: string;
     codigo: string;
@@ -93,11 +100,11 @@ export default function CursosScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await CursoService.eliminarCurso(curso.id);
+              await CursoService.eliminarCurso(curso.id, perfilDocente?.id);
               setModalOpcionesVisible(false);
               setCursoSeleccionado(null);
               cargarCursos();
-              Alert.alert('Eliminado', 'El curso se ha eliminado correctamente.');
+              Alert.alert('Eliminado', 'El curso y sus evidencias se han eliminado correctamente.');
             } catch (error: any) {
               Alert.alert('Error', error.message || 'No se pudo eliminar el curso.');
             }
@@ -208,6 +215,7 @@ export default function CursosScreen() {
       <ModalPerfilDocente
         visible={modalPerfilVisible}
         onClose={() => setModalPerfilVisible(false)}
+        onSincronizacionCompletada={cargarCursos}
       />
 
       {/* MODAL CREAR CURSO */}

@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
 import { useAuth } from '../../src/context/AuthContext';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
-// Tipado estricto para las evidencias
+// Tipado estricto para las evidencias extracurriculares
 interface EvidenciaExtracurricular {
   id: string;
   nombreActividad: string;
@@ -36,6 +37,7 @@ export default function ExtracurricularesScreen() {
   const [busqueda, setBusqueda] = useState('');
   const [unidadActiva, setUnidadActiva] = useState<string>('Todas');
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   // Identificador único del docente activo
@@ -103,7 +105,7 @@ export default function ExtracurricularesScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await evidenciaService.eliminarEvidencia(actividad.id);
+            await evidenciaService.eliminarEvidencia(actividad.id, perfilDocente?.id);
             cargarActividades();
           } catch (error) {
             Alert.alert('Error', 'No se pudo eliminar la actividad.');
@@ -127,11 +129,7 @@ export default function ExtracurricularesScreen() {
       <View style={styles.encabezado}>
         <Text style={styles.titulo}>Extracurriculares</Text>
         <View style={styles.iconosEncabezado}>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert('Perfil', `Docente: ${perfilDocente?.nombreCompleto || 'Docente General'}`)
-            }
-          >
+          <TouchableOpacity onPress={() => setModalPerfilVisible(true)}>
             <Ionicons name="person-outline" size={24} color="#1C252C" />
           </TouchableOpacity>
           <TouchableOpacity onPress={manejarCerrarSesion}>
@@ -220,6 +218,13 @@ export default function ExtracurricularesScreen() {
         subtitulo="Registra actividades complementarias (charlas, talleres, salidas)"
         tipos={['Charla', 'Campaña', 'Salida', 'Taller', 'Otro']}
         onGuardar={manejarGuardar}
+      />
+
+      {/* Modal Perfil Docente y Configuración */}
+      <ModalPerfilDocente
+        visible={modalPerfilVisible}
+        onClose={() => setModalPerfilVisible(false)}
+        onSincronizacionCompletada={cargarActividades}
       />
     </SafeAreaView>
   );

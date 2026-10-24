@@ -1,17 +1,23 @@
-// Pestaña "Informes": historial de informes y formulario para crear uno nuevo
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useInformes } from '../../src/hooks/useInformes';
 import { Informe } from '../../src/models/Informe';
 import { formatearFecha } from '../../src/utils/fechas';
 
-
 export default function InformesScreen() {
   const router = useRouter();
-  // cursoId llega cuando se toca "Generar Reporte" en las opciones de un curso
   const { cursoId } = useLocalSearchParams<{ cursoId?: string }>();
   const { informes, cargando, cargarInformes, descargarInforme, generandoPdf } = useInformes();
   const [busqueda, setBusqueda] = useState('');
@@ -31,53 +37,61 @@ export default function InformesScreen() {
     }
   };
 
-  // Recarga el historial cada vez que se entra a la pestaña
   useFocusEffect(
     useCallback(() => {
       cargarInformes();
     }, [cargarInformes])
   );
 
-  // "Generar reporte" de un curso abre el formulario con ese curso ya elegido
   useEffect(() => {
     if (!cursoId) return;
     router.setParams({ cursoId: undefined });
     router.push({ pathname: '/informe/nuevo', params: { cursoId } });
   }, [cursoId, router]);
 
-  // ---- Modo historial (diseño Figma: "Historial") ----
   return (
-    <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-      {/* HEADER: título centrado + perfil */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.espacioIcono} onPress={() => router.push('/informe/nuevo')} accessibilityLabel="Nuevo informe">
-          <Ionicons name="add-circle-outline" size={26} color="#1E88E5" />
-        </TouchableOpacity>
-        <Text style={styles.titulo}>Historial</Text>
-        <TouchableOpacity style={styles.espacioIcono} onPress={() => router.push('/modal')}>
-          <Ionicons name="person-outline" size={24} color="#0F172A" />
-        </TouchableOpacity>
+    <SafeAreaView style={styles.contenedorPadre} edges={['top', 'left', 'right']}>
+      {/* ENCABEZADO PRINCIPAL */}
+      <View style={styles.encabezado}>
+        <View style={styles.titulosContenedor}>
+          <Text style={styles.tituloPagina}>Historial de Informes</Text>
+          <Text style={styles.subtituloPagina}>
+            {informes.length === 1 ? '1 informe generado' : `${informes.length} informes generados`}
+          </Text>
+        </View>
+
+
       </View>
 
       {/* BUSCADOR */}
-      <View style={styles.buscador}>
-        <Ionicons name="search-outline" size={20} color="#475569" />
+      <View style={styles.contenedorBuscador}>
+        <Ionicons name="search-outline" size={20} color="#64748B" style={styles.iconoBuscador} />
         <TextInput
           style={styles.inputBuscador}
-          placeholder="buscar en el historial"
-          placeholderTextColor="#6B7280"
+          placeholder="Buscar por curso o N° informe..."
+          placeholderTextColor="#94A3B8"
           value={busqueda}
           onChangeText={setBusqueda}
         />
+        {busqueda.length > 0 && (
+          <TouchableOpacity onPress={() => setBusqueda('')}>
+            <Ionicons name="close-circle" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* LISTADO DE INFORMES */}
       {cargando ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#38BDF8" />
+        <View style={styles.cargandoContenedor}>
+          <ActivityIndicator size="large" color="#0284C7" />
+          <Text style={styles.textoCargando}>Cargando historial...</Text>
+        </View>
       ) : (
         <FlatList
           data={informesFiltrados}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.lista}
+          contentContainerStyle={styles.listaContenido}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TarjetaInforme
               informe={item}
@@ -87,14 +101,21 @@ export default function InformesScreen() {
             />
           )}
           ListEmptyComponent={
-            // Estado vacío: distingue "no hay informes" de "la búsqueda no encontró nada"
-            <View style={styles.vacio}>
-              <Ionicons name={busqueda ? 'search-outline' : 'document-text-outline'} size={48} color="#94A3B8" />
-              <Text style={styles.textoVacio}>{busqueda ? 'Sin resultados' : 'Aún no tienes informes'}</Text>
+            <View style={styles.vacioContenedor}>
+              <View style={styles.vacioIconoCirculo}>
+                <Ionicons
+                  name={busqueda ? 'search-outline' : 'document-text-outline'}
+                  size={36}
+                  color="#0284C7"
+                />
+              </View>
+              <Text style={styles.textoVacio}>
+                {busqueda ? 'Sin resultados encontrados' : 'No hay informes registrados'}
+              </Text>
               <Text style={styles.ayudaVacio}>
                 {busqueda
-                  ? `No hay informes que coincidan con "${busqueda}".`
-                  : 'Ve a la pestaña Curso, toca los tres puntos de un curso y elige "Generar Reporte".'}
+                  ? `No se encontraron coincidencias para "${busqueda}".`
+                  : 'Ve a la pestaña de Cursos, presiona los tres puntos de un curso y selecciona "Generar Reporte".'}
               </Text>
             </View>
           }
@@ -112,49 +133,221 @@ interface PropsTarjeta {
 }
 
 const TarjetaInforme = ({ informe, deshabilitado, onPress, onDescargar }: PropsTarjeta) => (
-  <TouchableOpacity style={styles.tarjeta} onPress={onPress}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.curso} numberOfLines={1}>{informe.nombreCurso}</Text>
-      <Text style={styles.fecha}>{formatearFecha(informe.creadoEn)}</Text>
+  <TouchableOpacity style={styles.tarjetaCard} onPress={onPress} activeOpacity={0.88}>
+    {/* Icono decorativo de documento */}
+    <View style={styles.iconoDocumentoBadge}>
+      <Ionicons name="document-text" size={22} color="#0284C7" />
     </View>
-    {/* Botón de descarga directa (sin abrir la vista previa) */}
-    <TouchableOpacity style={styles.botonDescargar} onPress={onDescargar} disabled={deshabilitado}>
-      <Ionicons name="arrow-down" size={22} color={deshabilitado ? '#9CA3AF' : '#111827'} />
+
+    {/* Detalle del informe */}
+    <View style={styles.infoContenedor}>
+      <View style={styles.filaEncabezadoCard}>
+        <Text style={styles.numeroInformeText} numberOfLines={1}>
+          {informe.numeroInforme ? `Informe N° ${informe.numeroInforme}` : 'Informe Académico'}
+        </Text>
+        <View style={styles.pillBadge}>
+          <Text style={styles.pillBadgeTexto}>PDF</Text>
+        </View>
+      </View>
+
+      <Text style={styles.cursoNombreText} numberOfLines={1}>
+        {informe.nombreCurso}
+      </Text>
+
+      <View style={styles.filaFechaText}>
+        <Ionicons name="calendar-outline" size={13} color="#64748B" />
+        <Text style={styles.fechaText}>{formatearFecha(informe.creadoEn)}</Text>
+      </View>
+    </View>
+
+    {/* Botón de acción para descarga directa */}
+    <TouchableOpacity
+      style={[styles.botonAccionDescargar, deshabilitado && styles.botonAccionDeshabilitado]}
+      onPress={onDescargar}
+      disabled={deshabilitado}
+      activeOpacity={0.7}
+    >
+      <Ionicons
+        name="cloud-download-outline"
+        size={20}
+        color={deshabilitado ? '#94A3B8' : '#0284C7'}
+      />
     </TouchableOpacity>
   </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  espacioIcono: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  titulo: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  buscador: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 14,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#E5E7EB',
+  contenedorPadre: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  inputBuscador: { flex: 1, fontSize: 15, color: '#111827' },
-  lista: { padding: 16, paddingTop: 24, gap: 10, flexGrow: 1 },
-  tarjeta: {
+  encabezado: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D9D9D9',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  titulosContenedor: {
+    flex: 1,
+  },
+  tituloPagina: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  subtituloPagina: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 2,
+  },
+
+  contenedorBuscador: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    height: 44,
     borderRadius: 22,
-    paddingVertical: 8,
-    paddingLeft: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#CBD5E1',
+  },
+  iconoBuscador: {
+    marginRight: 8,
+  },
+  inputBuscador: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  listaContenido: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  tarjetaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
+  iconoDocumentoBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoContenedor: {
+    flex: 1,
+  },
+  filaEncabezadoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
     paddingRight: 8,
   },
-  curso: { fontSize: 15, color: '#111827' },
-  fecha: { fontSize: 12, color: '#374151', marginTop: 4 },
-  botonDescargar: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  vacio: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
-  textoVacio: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  ayudaVacio: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
+  numeroInformeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+    textTransform: 'uppercase',
+  },
+  pillBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  pillBadgeTexto: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  cursoNombreText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  filaFechaText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  fechaText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  botonAccionDescargar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  botonAccionDeshabilitado: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  cargandoContenedor: {
+    marginTop: 60,
+    alignItems: 'center',
+    gap: 12,
+  },
+  textoCargando: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  vacioContenedor: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+  },
+  vacioIconoCirculo: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  textoVacio: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  ayudaVacio: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });

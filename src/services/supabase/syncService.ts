@@ -1,7 +1,7 @@
 import { decode } from 'base64-arraybuffer';
 import { eq, or } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
-// Importación Legacy para garantizar compatibilidad completa con Expo Go
+// Importación Legacy para garantizar compatibilidad con Expo Go Android/iOS
 import * as FileSystem from 'expo-file-system/legacy';
 import { db } from '../../database/client';
 import { cursos, evidencias } from '../../database/schema';
@@ -14,11 +14,11 @@ export interface ResultadoSincronizacion {
   evidenciasDescargadas: number;
 }
 
-// Regex estricto para validar UUID v4 de PostgreSQL
+// Regex estricto para validar UUID v4
 const REGEX_UUID_VALIDO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[0-89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
- * Convierte y sube una imagen local de la app hacia Supabase Storage
+ * Lee una imagen local en Base64 y la sube al bucket 'evidencias-imagenes' de Supabase Storage
  */
 async function subirArchivoStorage(
   bucket: string,
@@ -27,15 +27,12 @@ async function subirArchivoStorage(
   contentType: string
 ): Promise<string | null> {
   try {
-    // 1. Leer archivo local en Base64 mediante API Legacy
     const base64Data = await FileSystem.readAsStringAsync(uriLocal, {
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // 2. Decodificar Base64 a ArrayBuffer para la subida binaria
     const arrayBuffer = decode(base64Data);
 
-    // 3. Subir buffer binario al bucket en Supabase Storage
     const { error: storageError } = await supabase.storage
       .from(bucket)
       .upload(filePath, arrayBuffer, {
@@ -48,7 +45,6 @@ async function subirArchivoStorage(
       return null;
     }
 
-    // 4. Obtener URL pública persistente
     const { data: publicUrlData } = supabase.storage
       .from(bucket)
       .getPublicUrl(filePath);
@@ -60,9 +56,39 @@ async function subirArchivoStorage(
   }
 }
 
+/**
+ * Descarga una imagen remota desde Supabase hacia la memoria del dispositivo actual
+ */
+async function descargarImagenALocal(urlRemota: string, evidenciaId: string): Promise<string | null> {
+  try {
+    if (!urlRemota) return null;
+
+    const folderPath = `${FileSystem.documentDirectory}evidencias/`;
+
+    // Crear la carpeta física en el dispositivo si aún no existe
+    const folderInfo = await FileSystem.getInfoAsync(folderPath);
+    if (!folderInfo.exists) {
+      await FileSystem.makeDirectoryAsync(folderPath, { intermediates: true });
+    }
+
+    const localTargetUri = `${folderPath}${evidenciaId}.jpg`;
+
+    // Descargar el archivo binario
+    const downloadResult = await FileSystem.downloadAsync(urlRemota, localTargetUri);
+
+    if (downloadResult.status === 200) {
+      return downloadResult.uri;
+    }
+    return null;
+  } catch (error) {
+    console.error('[descargarImagenALocal Error]:', error);
+    return null;
+  }
+}
+
 export const syncService = {
   /**
-   * Sincroniza bidireccionalmente Cursos y Evidencias (con imágenes) entre SQLite local y Supabase
+   * Sincronización Bidireccional de Cursos, Evidencias e Imágenes físicas entre SQLite local y Supabase
    */
   async sincronizarTodo(cuentaId: string, perfilDocenteId?: string): Promise<ResultadoSincronizacion> {
     const res: ResultadoSincronizacion = {
@@ -136,7 +162,6 @@ export const syncService = {
           });
           res.cursosDescargados++;
         } else {
-          // Si el curso existe en la app pero la versión en la nube es más reciente, se actualiza localmente
           const fechaRemota = new Date(rc.actualizado_en || 0).getTime();
           const fechaLocal = new Date(localExistente.actualizadoEn || 0).getTime();
 
@@ -157,7 +182,7 @@ export const syncService = {
     }
 
     // ==========================================
-    // 2. SINCRONIZAR EVIDENCIAS E IMÁGENES
+    // 2. SINCRONIZAR EVIDENCIAS E IMÁGENES FÍSICAS
     // ==========================================
     const localEvidencias = await db
       .select()
@@ -169,11 +194,11 @@ export const syncService = {
         )
       );
 
+    // SUBIR EVIDENCIAS LOCALES Y SUS FOTOS A SUPABASE STORAGE
     for (const ev of localEvidencias) {
       let urlPublica = ev.urlRemota;
       const idEvidenciaUuid = REGEX_UUID_VALIDO.test(ev.id) ? ev.id : Crypto.randomUUID();
 
-      // Si tiene archivo local y no se ha subido, se envía a Supabase Storage
       if (ev.rutaArchivoLocal && !urlPublica) {
         const pathStorage = `evidencias/${cuentaId}/${idEvidenciaUuid}.jpg`;
         const urlSubida = await subirArchivoStorage(
@@ -220,6 +245,7 @@ export const syncService = {
       }
     }
 
+    // DESCARGAR EVIDENCIAS REMOTAS Y SUS IMÁGENES FÍSICAS AL DISPOSITIVO
     const { data: remoteEvidencias } = await supabase
       .from('evidencias')
       .select('*')
@@ -228,7 +254,15 @@ export const syncService = {
     if (remoteEvidencias) {
       for (const rev of remoteEvidencias) {
         const existe = localEvidencias.some((lev) => lev.id === rev.id);
+
         if (!existe) {
+          let rutaLocal: string | null = null;
+
+          // Si la evidencia en la nube tiene imagen, la descargamos al almacenamiento físico del teléfono
+          if (rev.url_publica) {
+            rutaLocal = await descargarImagenALocal(rev.url_publica, rev.id);
+          }
+
           await db.insert(evidencias).values({
             id: rev.id,
             perfilDocenteId: idPerfilLocal,
@@ -239,7 +273,7 @@ export const syncService = {
             descripcion: rev.descripcion || null,
             unidad: rev.unidad || null,
             tipoActividad: rev.tipo_actividad || null,
-            rutaArchivoLocal: null,
+            rutaArchivoLocal: rutaLocal, // Guarda la ruta local descargada
             urlRemota: rev.url_publica || null,
             tipoArchivo: rev.tipo_archivo || 'IMAGE',
             leyenda: rev.leyenda || null,

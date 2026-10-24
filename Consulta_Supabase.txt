@@ -1,0 +1,96 @@
+-- ==============================================================================
+-- CONSULTAS SQL LIMPIAS PARA SUPABASE (POSTGRESQL) - DOCUDOCENTE-APP
+-- Estrategia: Solo tablas necesarias para sincronización de datos y fotos.
+-- ==============================================================================
+
+-- 1. TABLA: DOCENTES
+CREATE TABLE IF NOT EXISTS public.docentes (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  correo          TEXT UNIQUE NOT NULL,
+  nombre          TEXT NOT NULL,
+  grado           TEXT NOT NULL DEFAULT 'Mg.',
+  contrasena_hash TEXT,
+  creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 2. TABLA: CURSOS
+CREATE TABLE IF NOT EXISTS public.cursos (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  docente_id     UUID NOT NULL REFERENCES public.docentes(id) ON DELETE CASCADE,
+  nombre         TEXT NOT NULL,
+  codigo         TEXT,
+  ciclo          TEXT NOT NULL,
+  semestre       TEXT NOT NULL,
+  local_id       TEXT UNIQUE,
+  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 3. TABLA: EVIDENCIAS (Académicas y Extracurriculares)
+CREATE TABLE IF NOT EXISTS public.evidencias (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  docente_id       UUID NOT NULL REFERENCES public.docentes(id) ON DELETE CASCADE,
+  curso_id         UUID REFERENCES public.cursos(id) ON DELETE CASCADE,
+  local_id         TEXT UNIQUE,
+  nombre_actividad TEXT NOT NULL,
+  descripcion      TEXT,
+  unidad           TEXT,
+  tipo_actividad   TEXT,
+  tipo_general     TEXT NOT NULL DEFAULT 'ACADEMICA',
+  tipo_archivo     TEXT NOT NULL DEFAULT 'IMAGE',
+  leyenda          TEXT,
+  storage_path     TEXT,
+  url_publica      TEXT,
+  creado_en        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ==============================================================================
+-- ROW LEVEL SECURITY (RLS)
+-- ==============================================================================
+ALTER TABLE public.docentes   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cursos     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.evidencias ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_todo_docentes') THEN
+    CREATE POLICY "permitir_todo_docentes" ON public.docentes FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_todo_cursos') THEN
+    CREATE POLICY "permitir_todo_cursos" ON public.cursos FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_todo_evidencias') THEN
+    CREATE POLICY "permitir_todo_evidencias" ON public.evidencias FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- ==============================================================================
+-- BUCKET DE STORAGE (Imágenes de Evidencias)
+-- ==============================================================================
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES 
+  ('evidencias-imagenes', 'evidencias-imagenes', true, 2097152, ARRAY['image/jpeg', 'image/png', 'image/webp'])
+ON CONFLICT (id) DO NOTHING;
+
+-- Políticas de Storage (Lectura, Subida, Edición y Eliminación)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_lectura_storage_evidencias') THEN
+    CREATE POLICY "permitir_lectura_storage_evidencias" ON storage.objects 
+    FOR SELECT USING (bucket_id = 'evidencias-imagenes');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_insercion_storage_evidencias') THEN
+    CREATE POLICY "permitir_insercion_storage_evidencias" ON storage.objects 
+    FOR INSERT WITH CHECK (bucket_id = 'evidencias-imagenes');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_actualizacion_storage_evidencias') THEN
+    CREATE POLICY "permitir_actualizacion_storage_evidencias" ON storage.objects 
+    FOR UPDATE USING (bucket_id = 'evidencias-imagenes');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'permitir_eliminacion_storage_evidencias') THEN
+    CREATE POLICY "permitir_eliminacion_storage_evidencias" ON storage.objects 
+    FOR DELETE USING (bucket_id = 'evidencias-imagenes');
+  END IF;
+END $$;

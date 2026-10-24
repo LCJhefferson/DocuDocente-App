@@ -7,7 +7,7 @@ Proyecto del curso **Programación de Aplicaciones Móviles** (2026-II) — Mg. 
 ## Funcionalidades (Unidad I)
 
 | Módulo | Qué hace |
-|---|---|
+| --- | --- |
 | Cuenta | Registro en 3 pasos, inicio y cierre de sesión (la sesión queda guardada). |
 | Cursos | Crear, editar y eliminar cursos; cada curso tiene Unidad 1, 2 y 3. |
 | Evidencias | Foto con cámara, galería o archivo, clasificada por tipo de actividad y unidad. |
@@ -40,10 +40,12 @@ Escanea el código QR que aparece en la terminal con Expo Go.
 **Si el celular no conecta** (redes de la universidad suelen bloquear la conexión local):
 
 - Usa la zona wifi del celular o la red de casa, y fuerza la IP de tu computadora:
+
   ```bash
   # Windows PowerShell (reemplaza por tu IP, la ves con ipconfig)
   $env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.1.9"; npx expo start --lan
   ```
+
 - O prueba el modo túnel: `npx expo start --tunnel`.
 
 > La versión web no está soportada: la app usa SQLite del teléfono.
@@ -51,7 +53,7 @@ Escanea el código QR que aparece en la terminal con Expo Go.
 ### Cuenta de prueba
 
 En una instalación nueva la app crea una cuenta de ejemplo (ver `src/database/client.ts`):
-**docente@ejemplo.com** / **123456**. También puedes crear tu propia cuenta.
+**<docente@ejemplo.com>** / **123456**. También puedes crear tu propia cuenta.
 
 El botón ↻ del detalle de un curso borra la base de datos local y la vuelve a crear (solo para desarrollo).
 
@@ -77,7 +79,7 @@ src/
 ## Equipo
 
 | Integrante | GitHub | Módulo |
-|---|---|---|
+| --- | --- | --- |
 | Jhefferson Leon Chupillon | [@LCJhefferson](https://github.com/LCJhefferson) | Base: login, registro, cursos, evidencias, BD |
 | Cristian Trigoso Santillan | [@luis412xd-lang](https://github.com/luis412xd-lang) | Actividades extracurriculares |
 | Jeferson Vela Chappa | [@jeffvc04](https://github.com/jeffvc04) | Notas y estadísticas |
@@ -89,11 +91,13 @@ src/
 1. Cada integrante trabaja en **su propia rama** creada desde `main` (ej. `cristian/extracurriculares`, `feature/notas-estadisticas`).
 2. Nadie sube cambios directo a `main`: se abre un **pull request** y Jhefferson lo revisa y lo une.
 3. Antes de empezar algo nuevo, crea la rama desde el `main` actualizado:
+
    ```bash
    git switch main
    git pull
    git switch -c tu-nombre/tu-modulo
    ```
+
 4. No modifiques archivos de otro módulo sin avisar a su responsable.
 
 ## Pendiente (siguientes unidades)
@@ -102,3 +106,30 @@ src/
 - Pantalla de plantilla personalizable (el PDF ya la lee de la tabla `plantillas`).
 - Corregir la lectura de Excel con columna inexistente y decimales con coma.
 - Cifrar contraseñas y backend con autenticación JWT.
+
+## ALmacenamiento Hibrido
+
+INSTALAR LO SIGUIENTE EN CONSOLA ::
+
+1. Para asegurar que la conversión de imágenes locales a binarios funcionen sin fallas en Expo Go Android/iOS,
+
+- npx expo install expo-crypto expo-file-system
+- npm install base64-arraybuffer
+
+1. Instalar la librería para manejo binario de imágenes
+
+- npm install base64-arraybuffer
+
+1. Para asegurar que la compresión de fotos y el manejo del sistema de archivos legacy funcionen    correctamente en Expo Go en Android
+
+- npx expo install expo-file-system expo-image-manipulator expo-crypto
+
+## LIBRERIAS PARA LO DE WORK
+
+- npx expo install expo-crypto expo-print expo-sharing expo-file-system
+- npm install docx
+
+## BD EN SUPABASE
+
+1. LA CONSULTA PARA LO DE SUPABASE SE ENCUeNTRA EN EL ARCHIVO Consulta_Supabase.txt.
+2. Crear un archivo .env en la Raiz del proyecto y comiar lo de .env.example y colocar los datos correpondientes de tu propia cuenta.

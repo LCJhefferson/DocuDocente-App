@@ -4,21 +4,23 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as XLSX from 'xlsx';
+import { useTheme } from '../../src/context/ThemeContext';
 import { estadisticasService } from '../../src/services/estadisticasService';
 
 export default function NotasEstadisticasScreen() {
   const router = useRouter();
   const { id: cursoId, nombre, unidad } = useLocalSearchParams<{ id: string; nombre?: string; unidad?: string }>();
+  const { isDarkMode } = useTheme();
 
   // Modo: 'analisis' (subir Excel) o 'manual' (ingreso directo)
   const [modo, setModo] = useState<'analisis' | 'manual'>('analisis');
@@ -51,7 +53,6 @@ export default function NotasEstadisticasScreen() {
           setAprobados(data.cantidadAprobados);
           setDesaprobados(data.cantidadDesaprobados);
           setArchivoProcesado(true);
-          // Mantenemos tipoGrafico en null para que no aparezca de golpe al entrar
         }
       } catch (err) {
         console.error('Error al cargar estadísticas previas:', err);
@@ -116,7 +117,7 @@ export default function NotasEstadisticasScreen() {
       let countAprob = 0;
       let countDesap = 0;
 
-      // Extraer notas de la columna especificada (omite encabezados de texto)
+      // Extraer notas de la columna especificada
       if (colIdx >= 0) {
         for (let r = 0; r < jsonData.length; r++) {
           const row = jsonData[r];
@@ -160,11 +161,11 @@ export default function NotasEstadisticasScreen() {
       setAprobados(countAprob);
       setDesaprobados(countDesap);
       setArchivoProcesado(true);
-      setTipoGrafico(null); // No muestra gráfico automáticamente al procesar
+      setTipoGrafico(null);
 
       Alert.alert(
         'Archivo procesado con éxito',
-        `Evaluados: ${countAprob + countDesap}\n• Aprobados: ${countAprob}\n• Desaprobados: ${countDesap}`
+        `Evaluados: ${countAprob + countDesap}\nAprobados: ${countAprob}\nDesaprobados: ${countDesap}`
       );
     } catch (error: any) {
       console.error('Error al procesar archivo:', error);
@@ -192,7 +193,7 @@ export default function NotasEstadisticasScreen() {
 
       Alert.alert(
         'Guardado en Base de Datos',
-        `Estadísticas guardadas exitosamente en SQLite:\n• Curso: ${nombre || 'Curso'}\n• ${unidad || 'Unidad 1'}\n• Evaluados: ${totalAlumnos} (Aprobados: ${aprobados}, Desaprobados: ${desaprobados})`,
+        `Estadísticas guardadas exitosamente en SQLite:\nCurso: ${nombre || 'Curso'}\n${unidad || 'Unidad 1'}\nEvaluados: ${totalAlumnos} (Aprobados: ${aprobados}, Desaprobados: ${desaprobados})`,
         [{ text: 'Aceptar', onPress: () => router.back() }]
       );
     } catch (error: any) {
@@ -242,11 +243,15 @@ export default function NotasEstadisticasScreen() {
         <View style={styles.leyendaGrafico}>
           <View style={styles.itemLeyenda}>
             <View style={[styles.puntoColor, { backgroundColor: '#F43F5E' }]} />
-            <Text style={styles.textoLeyenda}>Desaprobados ({desaprobados})</Text>
+            <Text style={[styles.textoLeyenda, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+              Desaprobados ({desaprobados})
+            </Text>
           </View>
           <View style={styles.itemLeyenda}>
             <View style={[styles.puntoColor, { backgroundColor: '#2DD4BF' }]} />
-            <Text style={styles.textoLeyenda}>Aprobados ({aprobados})</Text>
+            <Text style={[styles.textoLeyenda, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+              Aprobados ({aprobados})
+            </Text>
           </View>
         </View>
 
@@ -269,7 +274,9 @@ export default function NotasEstadisticasScreen() {
           <View style={styles.barrasGraficoContenedor}>
             <View style={styles.areaBarras}>
               <View style={styles.columnaBarra}>
-                <Text style={styles.labelValorBarra}>{desaprobados}</Text>
+                <Text style={[styles.labelValorBarra, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                  {desaprobados}
+                </Text>
                 <View
                   style={[
                     styles.barraFisica,
@@ -279,11 +286,15 @@ export default function NotasEstadisticasScreen() {
                     },
                   ]}
                 />
-                <Text style={styles.nombreBarra}>Desaprobados</Text>
+                <Text style={[styles.nombreBarra, { color: isDarkMode ? '#94A3B8' : '#475569' }]}>
+                  Desaprobados
+                </Text>
               </View>
 
               <View style={styles.columnaBarra}>
-                <Text style={styles.labelValorBarra}>{aprobados}</Text>
+                <Text style={[styles.labelValorBarra, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                  {aprobados}
+                </Text>
                 <View
                   style={[
                     styles.barraFisica,
@@ -293,7 +304,9 @@ export default function NotasEstadisticasScreen() {
                     },
                   ]}
                 />
-                <Text style={styles.nombreBarra}>Aprobados</Text>
+                <Text style={[styles.nombreBarra, { color: isDarkMode ? '#94A3B8' : '#475569' }]}>
+                  Aprobados
+                </Text>
               </View>
             </View>
           </View>
@@ -306,8 +319,12 @@ export default function NotasEstadisticasScreen() {
               <View style={[styles.barraSegmentoVerde, { flex: aprobados || 1 }]} />
             </View>
             <View style={styles.filaConteos}>
-              <Text style={styles.textoConteo}>Desaprobados: {pctDesaprobados}%</Text>
-              <Text style={styles.textoConteo}>Aprobados: {pctAprobados}%</Text>
+              <Text style={[styles.textoConteo, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+                Desaprobados: {pctDesaprobados}%
+              </Text>
+              <Text style={[styles.textoConteo, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+                Aprobados: {pctAprobados}%
+              </Text>
             </View>
           </View>
         )}
@@ -316,20 +333,31 @@ export default function NotasEstadisticasScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' }]}
+      edges={['top', 'left', 'right']}
+    >
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+        <TouchableOpacity
+          style={[
+            styles.botonAtras,
+            { backgroundColor: isDarkMode ? '#1E293B' : 'transparent', borderColor: isDarkMode ? '#334155' : '#38BDF8' },
+          ]}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
         </TouchableOpacity>
 
         <View style={styles.headerTitulos}>
           <Text style={styles.tituloGrande}>
             <Text style={styles.tituloVerde}>Notas </Text>
-            <Text style={styles.tituloNegro}>y estadísticas</Text>
+            <Text style={[styles.tituloNegro, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+              y estadísticas
+            </Text>
           </Text>
-          <Text style={styles.subtitulo} numberOfLines={1}>
-            Curso: {nombre || 'Curso'} - {unidad || 'Unidad 1'}
+          <Text style={[styles.subtitulo, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]} numberOfLines={1}>
+            Curso: {nombre || 'Curso'} · {unidad || 'Unidad 1'}
           </Text>
         </View>
       </View>
@@ -338,28 +366,64 @@ export default function NotasEstadisticasScreen() {
         {/* SELECTOR ENTRE ANÁLISIS Y MANUAL */}
         <View style={styles.contenedorTabs}>
           <TouchableOpacity
-            style={[styles.tabBoton, modo === 'analisis' && styles.tabBotonActivo]}
+            style={[
+              styles.tabBoton,
+              { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+              modo === 'analisis' && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+            ]}
             onPress={() => setModo('analisis')}
           >
-            <Text style={[styles.textoTab, modo === 'analisis' && styles.textoTabActivo]}>Analisis</Text>
+            <Text
+              style={[
+                styles.textoTab,
+                { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                modo === 'analisis' && { color: isDarkMode ? '#FFFFFF' : '#0F172A' },
+              ]}
+            >
+              Analisis
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBoton, modo === 'manual' && styles.tabBotonActivo]}
+            style={[
+              styles.tabBoton,
+              { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+              modo === 'manual' && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+            ]}
             onPress={() => setModo('manual')}
           >
-            <Text style={[styles.textoTab, modo === 'manual' && styles.textoTabActivo]}>manual</Text>
+            <Text
+              style={[
+                styles.textoTab,
+                { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                modo === 'manual' && { color: isDarkMode ? '#FFFFFF' : '#0F172A' },
+              ]}
+            >
+              manual
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* MODO ANÁLISIS */}
         {modo === 'analisis' && (
           <View style={styles.seccion}>
-            <Text style={styles.textoNotaMinima}>Nota minima aprobatoria: {notaMinima}</Text>
+            <Text style={[styles.textoNotaMinima, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+              Nota minima aprobatoria: {notaMinima}
+            </Text>
 
             {/* CARD RESUMEN ESTADÍSTICO */}
-            <View style={styles.cardResumen}>
-              <Text style={styles.tituloCard}>Resumen estadístico del archivo</Text>
+            <View
+              style={[
+                styles.cardResumen,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                },
+              ]}
+            >
+              <Text style={[styles.tituloCard, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                Resumen estadístico del archivo
+              </Text>
 
               {archivoProcesado && totalAlumnos > 0 ? (
                 <>
@@ -369,9 +433,18 @@ export default function NotasEstadisticasScreen() {
                       <Text style={styles.valorPillBlanca}>{pctAprobados}%</Text>
                     </View>
 
-                    <View style={styles.pillDesaprobados}>
-                      <Text style={styles.etiquetaPillRoja}>Desaprobados</Text>
-                      <Text style={styles.valorPillRoja}>{pctDesaprobados}%</Text>
+                    <View
+                      style={[
+                        styles.pillDesaprobados,
+                        { backgroundColor: isDarkMode ? '#4C0519' : '#FFE4E6' },
+                      ]}
+                    >
+                      <Text style={[styles.etiquetaPillRoja, { color: isDarkMode ? '#FB7185' : '#E11D48' }]}>
+                        Desaprobados
+                      </Text>
+                      <Text style={[styles.valorPillRoja, { color: isDarkMode ? '#FB7185' : '#E11D48' }]}>
+                        {pctDesaprobados}%
+                      </Text>
                     </View>
                   </View>
 
@@ -381,14 +454,18 @@ export default function NotasEstadisticasScreen() {
                   </View>
 
                   <View style={styles.filaConteos}>
-                    <Text style={styles.textoConteo}>{aprobados} aprobados</Text>
-                    <Text style={styles.textoConteo}>{desaprobados} desaprobados</Text>
+                    <Text style={[styles.textoConteo, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+                      {aprobados} aprobados
+                    </Text>
+                    <Text style={[styles.textoConteo, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+                      {desaprobados} desaprobados
+                    </Text>
                   </View>
                 </>
               ) : (
                 <View style={styles.contenedorSinDatos}>
                   <Ionicons name="cloud-upload-outline" size={32} color="#94A3B8" />
-                  <Text style={styles.textoSinDatos}>
+                  <Text style={[styles.textoSinDatos, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
                     Sube un archivo Excel o CSV para calcular el porcentaje de aprobados y desaprobados.
                   </Text>
                 </View>
@@ -397,13 +474,22 @@ export default function NotasEstadisticasScreen() {
 
             {/* BOTÓN PARA LIMPIAR DATOS */}
             {archivoProcesado && (
-              <TouchableOpacity style={styles.botonReiniciar} onPress={handleLimpiarDatos}>
+              <TouchableOpacity
+                style={[
+                  styles.botonReiniciar,
+                  {
+                    backgroundColor: isDarkMode ? '#451A1A' : '#FEF2F2',
+                    borderColor: isDarkMode ? '#7F1D1D' : '#FECACA',
+                  },
+                ]}
+                onPress={handleLimpiarDatos}
+              >
                 <Ionicons name="trash-outline" size={16} color="#EF4444" />
                 <Text style={styles.textoBotonReiniciar}>Borrar datos y subir nuevo archivo</Text>
               </TouchableOpacity>
             )}
 
-            {/* GRÁFICO DINÁMICO (SOLO VISIBLE SI SE PRESIONÓ UN BOTÓN DE TIPO DE GRÁFICO) */}
+            {/* GRÁFICO DINÁMICO */}
             {archivoProcesado && tipoGrafico !== null && (
               <View style={styles.areaGraficoContenedor}>
                 {renderGraficoSeleccionado()}
@@ -411,33 +497,62 @@ export default function NotasEstadisticasScreen() {
             )}
 
             {/* DROPZONE ARCHIVO */}
-            <TouchableOpacity style={styles.dropzone} onPress={handleSeleccionarArchivo}>
-              <Ionicons name="document-text-outline" size={26} color="#0F172A" />
-              <Text style={styles.tituloDropzone}>
+            <TouchableOpacity
+              style={[
+                styles.dropzone,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#FAFAFA',
+                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                },
+              ]}
+              onPress={handleSeleccionarArchivo}
+            >
+              <Ionicons name="document-text-outline" size={26} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+              <Text style={[styles.tituloDropzone, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
                 {nombreArchivo ? nombreArchivo : 'Subir archivo de notas'}
               </Text>
-              <Text style={styles.subtituloDropzone}>Excel (.xlsx) o CSV</Text>
+              <Text style={[styles.subtituloDropzone, { color: isDarkMode ? '#94A3B8' : '#94A3B8' }]}>
+                Excel (.xlsx) o CSV
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.filaInput}>
-              <Text style={styles.labelInput}>Eleccion de fila a analizar</Text>
+              <Text style={[styles.labelInput, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                Eleccion de fila a analizar
+              </Text>
               <TextInput
-                style={styles.inputChico}
+                style={[
+                  styles.inputChico,
+                  {
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  },
+                ]}
                 value={filaAnalizar}
                 onChangeText={setFilaAnalizar}
                 placeholder="F2"
+                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                 autoCapitalize="characters"
               />
             </View>
 
             <View style={styles.filaInput}>
-              <Text style={styles.labelInput}>Nota minima aprobatoria</Text>
+              <Text style={[styles.labelInput, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                Nota minima aprobatoria
+              </Text>
               <TextInput
-                style={styles.inputChico}
+                style={[
+                  styles.inputChico,
+                  {
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  },
+                ]}
                 value={notaMinima}
                 keyboardType="numeric"
                 onChangeText={setNotaMinima}
                 placeholder="14"
+                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
               />
             </View>
           </View>
@@ -447,13 +562,22 @@ export default function NotasEstadisticasScreen() {
         {modo === 'manual' && (
           <View style={styles.seccion}>
             {totalAlumnos > 0 && (
-              <TouchableOpacity style={styles.botonReiniciar} onPress={handleLimpiarDatos}>
+              <TouchableOpacity
+                style={[
+                  styles.botonReiniciar,
+                  {
+                    backgroundColor: isDarkMode ? '#451A1A' : '#FEF2F2',
+                    borderColor: isDarkMode ? '#7F1D1D' : '#FECACA',
+                  },
+                ]}
+                onPress={handleLimpiarDatos}
+              >
                 <Ionicons name="trash-outline" size={16} color="#EF4444" />
                 <Text style={styles.textoBotonReiniciar}>Restablecer campos a cero</Text>
               </TouchableOpacity>
             )}
 
-            {/* GRÁFICO EN MANUAL (SOLO VISIBLE SI SE SELECCIONÓ UN BOTÓN) */}
+            {/* GRÁFICO EN MANUAL */}
             {tipoGrafico !== null && (
               <View style={styles.areaGraficoContenedor}>
                 {renderGraficoSeleccionado()}
@@ -461,33 +585,60 @@ export default function NotasEstadisticasScreen() {
             )}
 
             <View style={styles.filaInput}>
-              <Text style={styles.labelInput}>Numero de aprobados</Text>
+              <Text style={[styles.labelInput, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                Numero de aprobados
+              </Text>
               <TextInput
-                style={styles.inputChico}
+                style={[
+                  styles.inputChico,
+                  {
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  },
+                ]}
                 keyboardType="numeric"
                 value={aprobados === 0 ? '' : String(aprobados)}
                 placeholder="0"
+                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                 onChangeText={(t) => setAprobados(parseInt(t, 10) || 0)}
               />
             </View>
 
             <View style={styles.filaInput}>
-              <Text style={styles.labelInput}>Numero de desaprobados</Text>
+              <Text style={[styles.labelInput, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                Numero de desaprobados
+              </Text>
               <TextInput
-                style={styles.inputChico}
+                style={[
+                  styles.inputChico,
+                  {
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  },
+                ]}
                 keyboardType="numeric"
                 value={desaprobados === 0 ? '' : String(desaprobados)}
                 placeholder="0"
+                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                 onChangeText={(t) => setDesaprobados(parseInt(t, 10) || 0)}
               />
             </View>
 
             <View style={styles.filaInput}>
-              <Text style={styles.labelInput}>Nota minima aprobatoria</Text>
+              <Text style={[styles.labelInput, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                Nota minima aprobatoria
+              </Text>
               <TextInput
-                style={styles.inputChico}
+                style={[
+                  styles.inputChico,
+                  {
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  },
+                ]}
                 keyboardType="numeric"
                 value={notaMinima}
+                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                 onChangeText={setNotaMinima}
               />
             </View>
@@ -496,36 +647,59 @@ export default function NotasEstadisticasScreen() {
 
         {/* SELECTOR DE TIPO DE GRÁFICO */}
         <View style={styles.contenedorTipoGrafico}>
-          <Text style={styles.tituloTipoGrafico}>Tipo de grafico</Text>
+          <Text style={[styles.tituloTipoGrafico, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+            Tipo de grafico
+          </Text>
           <View style={styles.filaBotonesGrafico}>
             <TouchableOpacity
-              style={[styles.botonGraficoPill, tipoGrafico === 'pastel' && styles.botonGraficoPillActivo]}
+              style={[
+                styles.botonGraficoPill,
+                { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+                tipoGrafico === 'pastel' && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+              ]}
               onPress={() => toggleTipoGrafico('pastel')}
             >
-              <Ionicons name="pie-chart" size={16} color="#0F172A" />
-              <Text style={styles.textoBotonGrafico}>Pastel</Text>
+              <Ionicons name="pie-chart" size={16} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+              <Text style={[styles.textoBotonGrafico, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                Pastel
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.botonGraficoPill, tipoGrafico === 'barras' && styles.botonGraficoPillActivo]}
+              style={[
+                styles.botonGraficoPill,
+                { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+                tipoGrafico === 'barras' && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+              ]}
               onPress={() => toggleTipoGrafico('barras')}
             >
-              <Ionicons name="bar-chart" size={16} color="#0F172A" />
-              <Text style={styles.textoBotonGrafico}>Barras</Text>
+              <Ionicons name="bar-chart" size={16} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+              <Text style={[styles.textoBotonGrafico, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                Barras
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.botonGraficoPill, tipoGrafico === 'segmentada' && styles.botonGraficoPillActivo]}
+              style={[
+                styles.botonGraficoPill,
+                { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+                tipoGrafico === 'segmentada' && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+              ]}
               onPress={() => toggleTipoGrafico('segmentada')}
             >
-              <Ionicons name="stats-chart" size={16} color="#0F172A" />
-              <Text style={styles.textoBotonGrafico}>barra segmentada</Text>
+              <Ionicons name="stats-chart" size={16} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+              <Text style={[styles.textoBotonGrafico, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                barra segmentada
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* BOTÓN CONFIRMAR Y GUARDAR */}
-        <TouchableOpacity style={styles.botonConfirmar} onPress={handleGuardar}>
+        <TouchableOpacity
+          style={[styles.botonConfirmar, { backgroundColor: isDarkMode ? '#0284C7' : '#0EA5E9' }]}
+          onPress={handleGuardar}
+        >
           <Text style={styles.textoBotonConfirmar}>Confirmar y guardar</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -536,7 +710,6 @@ export default function NotasEstadisticasScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -550,7 +723,6 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 1.5,
-    borderColor: '#38BDF8',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -566,12 +738,9 @@ const styles = StyleSheet.create({
   tituloVerde: {
     color: '#22C55E',
   },
-  tituloNegro: {
-    color: '#0F172A',
-  },
+  tituloNegro: {},
   subtitulo: {
     fontSize: 11,
-    color: '#94A3B8',
     marginTop: 2,
   },
   scrollContenido: {
@@ -588,18 +757,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-  },
-  tabBotonActivo: {
-    backgroundColor: '#BAE6FD',
   },
   textoTab: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
-  },
-  textoTabActivo: {
-    color: '#0F172A',
   },
   seccion: {
     width: '100%',
@@ -607,15 +768,12 @@ const styles = StyleSheet.create({
   textoNotaMinima: {
     textAlign: 'center',
     fontSize: 11,
-    color: '#94A3B8',
     marginBottom: 8,
   },
   cardResumen: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 14,
-    backgroundColor: '#F8FAFC',
     marginBottom: 12,
     minHeight: 110,
     justifyContent: 'center',
@@ -628,9 +786,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     marginBottom: 14,
     borderRadius: 10,
-    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
   },
   textoBotonReiniciar: {
     fontSize: 12,
@@ -642,7 +798,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   textoSinDatos: {
-    color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
     marginTop: 6,
@@ -651,7 +806,6 @@ const styles = StyleSheet.create({
   tituloCard: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
     marginBottom: 10,
   },
   filaPorcentajes: {
@@ -681,7 +835,6 @@ const styles = StyleSheet.create({
   },
   pillDesaprobados: {
     flex: 1,
-    backgroundColor: '#FFE4E6',
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -690,12 +843,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   etiquetaPillRoja: {
-    color: '#E11D48',
     fontSize: 11,
     fontWeight: '600',
   },
   valorPillRoja: {
-    color: '#E11D48',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -718,28 +869,23 @@ const styles = StyleSheet.create({
   },
   textoConteo: {
     fontSize: 11,
-    color: '#94A3B8',
   },
   dropzone: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
     marginBottom: 16,
-    backgroundColor: '#FAFAFA',
   },
   tituloDropzone: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
     marginTop: 6,
   },
   subtituloDropzone: {
     fontSize: 11,
-    color: '#94A3B8',
     marginTop: 2,
   },
   filaInput: {
@@ -750,17 +896,14 @@ const styles = StyleSheet.create({
   },
   labelInput: {
     fontSize: 13,
-    color: '#334155',
     fontWeight: '500',
   },
   inputChico: {
     width: 90,
     height: 36,
-    backgroundColor: '#F1F5F9',
     borderRadius: 10,
     textAlign: 'center',
     fontWeight: '600',
-    color: '#0F172A',
     fontSize: 13,
   },
   areaGraficoContenedor: {
@@ -789,7 +932,6 @@ const styles = StyleSheet.create({
   },
   textoLeyenda: {
     fontSize: 11,
-    color: '#64748B',
   },
   pastelContenedor: {
     alignItems: 'center',
@@ -847,7 +989,6 @@ const styles = StyleSheet.create({
   labelValorBarra: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0F172A',
     marginBottom: 4,
   },
   barraFisica: {
@@ -858,7 +999,6 @@ const styles = StyleSheet.create({
   nombreBarra: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
     marginTop: 6,
   },
   graficoSegmentadoBox: {
@@ -879,7 +1019,6 @@ const styles = StyleSheet.create({
   tituloTipoGrafico: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
     marginBottom: 8,
   },
   filaBotonesGrafico: {
@@ -894,21 +1033,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
     gap: 5,
-  },
-  botonGraficoPillActivo: {
-    backgroundColor: '#BAE6FD',
   },
   textoBotonGrafico: {
     fontSize: 11,
-    color: '#0F172A',
     fontWeight: '600',
   },
   botonConfirmar: {
     width: '100%',
     height: 50,
-    backgroundColor: '#0EA5E9',
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

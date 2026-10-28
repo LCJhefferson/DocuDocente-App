@@ -15,16 +15,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CursoCard } from '../../src/components/cursos/CursoCard';
+import { MenuDocente } from '../../src/components/MenuDocente';
 import { ModalCrearCurso } from '../../src/components/modals/ModalCrearCurso';
 import { ModalOpcionesCurso } from '../../src/components/modals/ModalOpcionesCurso';
-import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { Curso } from '../../src/models/Curso';
 import { CursoService } from '../../src/services/cursoService';
 
 export default function CursosScreen() {
   const router = useRouter();
-  const { perfilDocente, cerrarSesion } = useAuth();
+  const { perfilDocente } = useAuth(); // Ya no necesitamos cerrarSesion suelto aquí
+  const { isDarkMode } = useTheme();
 
   const [cursosList, setCursosList] = useState<Curso[]>([]);
   const [busqueda, setBusqueda] = useState('');
@@ -33,7 +35,7 @@ export default function CursosScreen() {
   // Modales
   const [modalCrearVisible, setModalCrearVisible] = useState(false);
   const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
-  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
+  const [modalMenuVisible, setModalMenuVisible] = useState(false); // Estado para el menú lateral
   const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
   const cargarCursos = useCallback(async () => {
@@ -53,7 +55,6 @@ export default function CursosScreen() {
     cargarCursos();
   }, [cargarCursos]);
 
-  // Recargar cursos automáticamente cuando la pantalla gane foco en Expo Router
   useFocusEffect(
     useCallback(() => {
       cargarCursos();
@@ -130,39 +131,29 @@ export default function CursosScreen() {
     });
   };
 
-  const manejarCerrarSesion = () => {
-    Alert.alert('Cerrar Sesión', '¿Está seguro de que desea salir de la aplicación?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => cerrarSesion() },
-    ]);
-  };
-
   return (
-    <SafeAreaView style={styles.contenedorPadre} edges={['top', 'left', 'right']}>
-      {/* ENCABEZADO PRINCIPAL */}
+    <SafeAreaView
+      style={[
+        styles.contenedorPadre,
+        { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' },
+      ]}
+      edges={['top', 'left', 'right', 'bottom']}
+    >
+      {/* ENCABEZADO SUPERIOR: SOLO EL BOTÓN DE LAS 3 RAYAS */}
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
-          onPress={() => setModalPerfilVisible(true)}
+          onPress={() => setModalMenuVisible(true)}
         >
-          <Ionicons name="person-outline" size={24} color="#1C252C" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.botonIconoHeader} onPress={manejarCerrarSesion}>
-          <Ionicons name="log-out-outline" size={26} color="#1C252C" />
+          <Ionicons
+            name="menu"
+            size={28}
+            color={isDarkMode ? '#F8FAFC' : '#1C252C'}
+          />
         </TouchableOpacity>
       </View>
 
       <View style={styles.seccionHeaderLogo}>
-        <TouchableOpacity
-          style={styles.botonNuevoCurso}
-          onPress={() => setModalCrearVisible(true)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-          <Text style={styles.textoBotonNuevo}>Nuevo Curso</Text>
-        </TouchableOpacity>
-
         <View style={styles.contenedorLogoCursos}>
           <Image
             source={require('../../assets/images/arrendajo_curso.png')}
@@ -173,10 +164,21 @@ export default function CursosScreen() {
       </View>
 
       {/* BUSCADOR */}
-      <View style={styles.contenedorBuscador}>
+      <View
+        style={[
+          styles.contenedorBuscador,
+          {
+            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+            borderColor: isDarkMode ? '#334155' : '#388EB2',
+          },
+        ]}
+      >
         <Ionicons name="search-outline" size={20} color="#7A8B93" style={styles.iconoBuscador} />
         <TextInput
-          style={styles.entradaBuscador}
+          style={[
+            styles.entradaBuscador,
+            { color: isDarkMode ? '#F8FAFC' : '#1C252C' },
+          ]}
           placeholder="Buscar curso"
           placeholderTextColor="#8E9AA0"
           value={busqueda}
@@ -186,7 +188,11 @@ export default function CursosScreen() {
 
       {/* LISTADO DE CURSOS */}
       {cargando ? (
-        <ActivityIndicator size="large" color="#1E88E5" style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color={isDarkMode ? '#38BDF8' : '#1E88E5'}
+          style={{ marginTop: 40 }}
+        />
       ) : (
         <FlatList
           data={cursosList}
@@ -195,7 +201,9 @@ export default function CursosScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.vacioContenedor}>
-              <Text style={styles.textoVacio}>No tienes cursos registrados aún.</Text>
+              <Text style={[styles.textoVacio, { color: isDarkMode ? '#94A3B8' : '#8E9AA0' }]}>
+                No tienes cursos registrados aún.
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -211,10 +219,23 @@ export default function CursosScreen() {
         />
       )}
 
-      {/* MODAL PERFIL Y CONFIGURACIÓN */}
-      <ModalPerfilDocente
-        visible={modalPerfilVisible}
-        onClose={() => setModalPerfilVisible(false)}
+      {/* BOTÓN FLOTANTE NUEVO CURSO */}
+      <TouchableOpacity
+        style={[
+          styles.botonNuevoCursoFlotante,
+          { backgroundColor: isDarkMode ? '#0284C7' : '#2679A8' },
+        ]}
+        onPress={() => setModalCrearVisible(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={22} color="#FFFFFF" />
+        <Text style={styles.textoBotonNuevo}>Nuevo Curso</Text>
+      </TouchableOpacity>
+
+      {/* MENÚ LATERAL DERECHO (ESTILO FACEBOOK) */}
+      <MenuDocente
+        visible={modalMenuVisible}
+        onClose={() => setModalMenuVisible(false)}
         onSincronizacionCompletada={cargarCursos}
       />
 
@@ -244,65 +265,64 @@ export default function CursosScreen() {
 const styles = StyleSheet.create({
   contenedorPadre: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
   },
   encabezadoSuperior: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start', // Alineado a la izquierda para el menú de 3 rayas
     alignItems: 'center',
-    gap: 12,
     marginTop: 6,
   },
   botonIconoHeader: {
     padding: 6,
   },
   seccionHeaderLogo: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
     marginBottom: 10,
   },
-  botonNuevoCurso: {
+  botonNuevoCursoFlotante: {
     position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 10,
+    bottom: 25,
+    right: 20,
+    zIndex: 99,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2679A8',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 15,
+    borderRadius: 30,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
   textoBotonNuevo: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 13,
-    marginLeft: 4,
+    fontSize: 15,
+    marginLeft: 8,
   },
   contenedorLogoCursos: {
     width: '100%',
-    height: 130,
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   imagenLogoCursos: {
-    width: '85%',
+    width: '80%',
     height: '100%',
   },
   contenedorBuscador: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.2,
-    borderColor: '#388EB2',
     borderRadius: 25,
     paddingHorizontal: 16,
     height: 46,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
   },
   iconoBuscador: {
     marginRight: 10,
@@ -310,17 +330,15 @@ const styles = StyleSheet.create({
   entradaBuscador: {
     flex: 1,
     fontSize: 15,
-    color: '#1C252C',
   },
   listaContenedor: {
-    paddingBottom: 20,
+    paddingBottom: 90,
   },
   vacioContenedor: {
     alignItems: 'center',
     marginTop: 50,
   },
   textoVacio: {
-    color: '#8E9AA0',
     fontSize: 15,
   },
 });

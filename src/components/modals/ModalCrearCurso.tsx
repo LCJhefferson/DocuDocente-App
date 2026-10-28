@@ -1,184 +1,245 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
-interface Props {
+interface ModalCrearCursoProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (datos: { nombre: string; codigo: string; ciclo: string; semestre: string }) => Promise<void>;
+  onSubmit: (datos: {
+    nombre: string;
+    codigo: string;
+    ciclo: string;
+    semestre: string;
+  }) => void;
 }
 
-export const ModalCrearCurso: React.FC<Props> = ({ visible, onClose, onSubmit }) => {
+export const ModalCrearCurso: React.FC<ModalCrearCursoProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+}) => {
+  const { isDarkMode } = useTheme();
+
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
   const [ciclo, setCiclo] = useState('');
   const [semestre, setSemestre] = useState('');
-  const [guardando, setGuardando] = useState(false);
 
-  const manejarGuardar = async () => {
-    if (!nombre.trim() || !ciclo.trim() || !semestre.trim()) {
-      Alert.alert('Atención', 'Por favor complete el nombre, ciclo y semestre.');
+  const handleGuardar = () => {
+    if (!nombre.trim() || !codigo.trim() || !ciclo.trim() || !semestre.trim()) {
+      Alert.alert('Campos incompletos', 'Por favor, completa todos los campos para crear el curso.');
       return;
     }
 
-    setGuardando(true);
-    try {
-      await onSubmit({
-        nombre: nombre.trim(),
-        codigo: codigo.trim(),
-        ciclo: ciclo.trim(),
-        semestre: semestre.trim(),
-      });
-      setNombre('');
-      setCodigo('');
-      setCiclo('');
-      setSemestre('');
-      onClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo crear el curso.');
-    } finally {
-      setGuardando(false);
-    }
+    onSubmit({
+      nombre: nombre.trim(),
+      codigo: codigo.trim(),
+      ciclo: ciclo.trim(),
+      semestre: semestre.trim(),
+    });
+
+    // Limpiar campos y cerrar modal
+    setNombre('');
+    setCodigo('');
+    setCiclo('');
+    setSemestre('');
+    onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.modalFondo}>
-        <View style={styles.modalTarjeta}>
-          <Text style={styles.modalTitulo}>Crear Nuevo Curso</Text>
-
-          <Text style={styles.etiqueta}>Nombre de la Asignatura *</Text>
-          <TextInput
-            style={styles.entradaTextoModal}
-            value={nombre}
-            onChangeText={setNombre}
-            placeholder="Ej. Desarrollo de Aplicaciones"
-          />
-
-          <View style={styles.filaCampos}>
-            <View style={{ flex: 1, marginRight: 6 }}>
-              <Text style={styles.etiqueta}>Ciclo *</Text>
-              <TextInput
-                style={styles.entradaTextoModal}
-                value={ciclo}
-                onChangeText={setCiclo}
-                placeholder="Ej. V"
-              />
-            </View>
-
-            <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={styles.etiqueta}>Semestre *</Text>
-              <TextInput
-                style={styles.entradaTextoModal}
-                value={semestre}
-                onChangeText={setSemestre}
-                placeholder="Ej. 2026-I"
-              />
-            </View>
-          </View>
-
-          <Text style={styles.etiqueta}>Código de Curso (Opcional)</Text>
-          <TextInput
-            style={styles.entradaTextoModal}
-            value={codigo}
-            onChangeText={setCodigo}
-            placeholder="Ej. INF-101"
-          />
-
-          <View style={styles.modalBotones}>
-            <TouchableOpacity style={[styles.botonModal, styles.botonCancelar]} onPress={onClose}>
-              <Text style={styles.textoBotonCancelar}>Cancelar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.botonModal, styles.botonGuardar]}
-              onPress={manejarGuardar}
-              disabled={guardando}
-            >
-              {guardando ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.textoBotonGuardar}>Guardar</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView
+        style={[
+          styles.pantallaCompleta,
+          { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' },
+        ]}
+        edges={['top', 'left', 'right', 'bottom']}
+      >
+        {/* CABECERA */}
+        <View style={styles.encabezadoModal}>
+          <TouchableOpacity
+            style={[
+              styles.botonVolver,
+              {
+                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                borderColor: isDarkMode ? '#334155' : '#BAE6FD',
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Ionicons name="chevron-back" size={24} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+          </TouchableOpacity>
+          <Text style={[styles.tituloModal, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+            Registrar Nuevo Curso
+          </Text>
         </View>
-      </View>
+
+        <View style={styles.formularioContainer}>
+          {/* CAMPO NOMBRE */}
+          <View style={styles.grupoCampo}>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Nombre del Curso
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
+              placeholder="Ej: Programación Móvil"
+              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+              value={nombre}
+              onChangeText={setNombre}
+            />
+          </View>
+
+          {/* CAMPO CÓDIGO */}
+          <View style={styles.grupoCampo}>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Código
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
+              placeholder="Ej: IS-042"
+              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+              value={codigo}
+              onChangeText={setCodigo}
+            />
+          </View>
+
+          {/* CAMPO CICLO */}
+          <View style={styles.grupoCampo}>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Ciclo
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
+              placeholder="Ej: VII Ciclo"
+              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+              value={ciclo}
+              onChangeText={setCiclo}
+            />
+          </View>
+
+          {/* CAMPO SEMESTRE */}
+          <View style={styles.grupoCampo}>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Semestre Académico
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
+              placeholder="Ej: 2026-I"
+              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+              value={semestre}
+              onChangeText={setSemestre}
+            />
+          </View>
+
+          {/* BOTÓN GUARDAR */}
+          <TouchableOpacity
+            style={[
+              styles.botonGuardar,
+              { backgroundColor: isDarkMode ? '#0284C7' : '#2679A8' },
+            ]}
+            onPress={handleGuardar}
+          >
+            <Text style={styles.textoBotonGuardar}>Guardar Curso</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalFondo: {
+  pantallaCompleta: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalTarjeta: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 22,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  modalTitulo: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1C252C',
-    marginBottom: 16,
-  },
-  etiqueta: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5B63',
-    marginBottom: 4,
-  },
-  entradaTextoModal: {
-    backgroundColor: '#F2F5F7',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 14,
-    fontSize: 14,
-    color: '#1C252C',
-  },
-  filaCampos: {
-    flexDirection: 'row',
-  },
-  modalBotones: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    gap: 10,
-  },
-  botonModal: {
-    paddingVertical: 11,
     paddingHorizontal: 20,
-    borderRadius: 10,
   },
-  botonCancelar: {
-    backgroundColor: '#E5E9EB',
+  encabezadoModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  botonVolver: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tituloModal: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  formularioContainer: {
+    marginTop: 20,
+  },
+  grupoCampo: {
+    marginBottom: 18,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
   },
   botonGuardar: {
-    backgroundColor: '#1E88E5',
-  },
-  textoBotonCancelar: {
-    color: '#334148',
-    fontWeight: '600',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 20,
   },
   textoBotonGuardar: {
     color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
   },
 });

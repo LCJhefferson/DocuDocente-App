@@ -1,15 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View } from 'react-native';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function TabLayout() {
+  const { isDarkMode } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#002840',
-        tabBarInactiveTintColor: '#5A7382',
-        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: isDarkMode ? '#38BDF8' : '#002840',
+        tabBarInactiveTintColor: isDarkMode ? '#94A3B8' : '#5A7382',
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            backgroundColor: isDarkMode ? '#0F172A' : '#E1F3FB',
+            borderTopColor: isDarkMode ? '#1E293B' : 'transparent',
+          },
+        ],
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -18,9 +27,22 @@ export default function TabLayout() {
         name="extracurriculares"
         options={{
           title: 'Extracurriculares',
+          // @ts-ignore
           tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.contenedorIcono, focused && styles.iconoActivo]}>
-              <Ionicons name="basketball-outline" size={20} color={focused ? '#002840' : color} />
+            <View
+              style={[
+                styles.contenedorIcono,
+                focused && [
+                  styles.iconoActivo,
+                  { backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF' },
+                ],
+              ]}
+            >
+              <Ionicons
+                name="basketball-outline"
+                size={20}
+                color={focused ? (isDarkMode ? '#38BDF8' : '#002840') : color}
+              />
             </View>
           ),
         }}
@@ -31,9 +53,22 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Curso',
+          // @ts-ignore
           tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.contenedorIcono, focused && styles.iconoActivo]}>
-              <Ionicons name="school-outline" size={20} color={focused ? '#002840' : color} />
+            <View
+              style={[
+                styles.contenedorIcono,
+                focused && [
+                  styles.iconoActivo,
+                  { backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF' },
+                ],
+              ]}
+            >
+              <Ionicons
+                name="school-outline"
+                size={20}
+                color={focused ? (isDarkMode ? '#38BDF8' : '#002840') : color}
+              />
             </View>
           ),
         }}
@@ -44,22 +79,48 @@ export default function TabLayout() {
         name="two"
         options={{
           title: 'Informes',
+          // @ts-ignore
           tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.contenedorIcono, focused && styles.iconoActivo]}>
-              <Ionicons name="document-text-outline" size={20} color={focused ? '#002840' : color} />
+            <View
+              style={[
+                styles.contenedorIcono,
+                focused && [
+                  styles.iconoActivo,
+                  { backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF' },
+                ],
+              ]}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color={focused ? (isDarkMode ? '#38BDF8' : '#002840') : color}
+              />
             </View>
           ),
         }}
       />
 
-      {/* 4. Plantillas (NUEVA PESTAÑA) */}
+      {/* 4. Plantillas */}
       <Tabs.Screen
         name="plantillas"
         options={{
           title: 'Plantillas',
+          // @ts-ignore
           tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.contenedorIcono, focused && styles.iconoActivo]}>
-              <Ionicons name="copy-outline" size={20} color={focused ? '#002840' : color} />
+            <View
+              style={[
+                styles.contenedorIcono,
+                focused && [
+                  styles.iconoActivo,
+                  { backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF' },
+                ],
+              ]}
+            >
+              <Ionicons
+                name="copy-outline"
+                size={20}
+                color={focused ? (isDarkMode ? '#38BDF8' : '#002840') : color}
+              />
             </View>
           ),
         }}
@@ -70,7 +131,6 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#E1F3FB', // Fondo Azul Pastel
     borderTopWidth: 0,
     height: Platform.OS === 'ios' ? 82 : 64,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
@@ -92,6 +152,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   iconoActivo: {
-    backgroundColor: '#FFFFFF', // Fondo blanco delimitado en píldora compacta
+    // Se ajusta dinámicamente arriba según el modo
   },
 });

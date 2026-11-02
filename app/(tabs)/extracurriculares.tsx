@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,9 +11,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ModalPerfilDocente } from '../../src/components/modals/ModalPerfilDocente';
+import { MenuDocente } from '../../src/components/MenuDocente';
 import { ModalSubirEvidencia } from '../../src/components/modals/ModalSubirEvidencia';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { evidenciaService } from '../../src/services/evidenciaService';
 
 // Tipado estricto para las evidencias extracurriculares
@@ -31,13 +32,14 @@ interface EvidenciaExtracurricular {
 const UNIDADES = ['Todas', 'Unidad 1', 'Unidad 2', 'Unidad 3'];
 
 export default function ExtracurricularesScreen() {
-  const { perfilDocente, cuentaId, cerrarSesion } = useAuth();
+  const { perfilDocente, cuentaId } = useAuth();
+  const { isDarkMode } = useTheme();
 
   const [actividades, setActividades] = useState<EvidenciaExtracurricular[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [unidadActiva, setUnidadActiva] = useState<string>('Todas');
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
+  const [modalMenuVisible, setModalMenuVisible] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   // Identificador único del docente activo
@@ -75,7 +77,7 @@ export default function ExtracurricularesScreen() {
       await evidenciaService.crearEvidencia({
         perfilDocenteId: idDocenteActivo,
         tipoGeneral: 'EXTRACURRICULAR',
-        cursoId: undefined, // Explícitamente no asignado a curso
+        cursoId: undefined,
         nombreActividad: datos.nombreActividad,
         descripcion: datos.descripcion,
         unidad: unidadActiva === 'Todas' ? 'General' : unidadActiva,
@@ -88,13 +90,6 @@ export default function ExtracurricularesScreen() {
     } catch (error) {
       Alert.alert('Error', 'No se pudo guardar la actividad extracurricular.');
     }
-  };
-
-  const manejarCerrarSesion = () => {
-    Alert.alert('Cerrar Sesión', '¿Está seguro de que desea salir de la aplicación?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => cerrarSesion() },
-    ]);
   };
 
   const manejarEliminar = (actividad: EvidenciaExtracurricular) => {
@@ -115,7 +110,6 @@ export default function ExtracurricularesScreen() {
     ]);
   };
 
-  // Filtrado optimizado por búsqueda y unidad activa
   const actividadesFiltradas = actividades.filter((a) => {
     const coincideBusqueda = a.nombreActividad?.toLowerCase().includes(busqueda.toLowerCase());
     const coincideUnidad =
@@ -124,18 +118,24 @@ export default function ExtracurricularesScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.contenedor} edges={['top', 'left', 'right']}>
-      {/* Encabezado Superior */}
+    <SafeAreaView
+      style={[styles.contenedor, { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' }]}
+      edges={['top', 'left', 'right']}
+    >
+      {/* Encabezado Superior con el botón de las tres rayas a la izquierda */}
       <View style={styles.encabezado}>
-        <Text style={styles.titulo}>Extracurriculares</Text>
-        <View style={styles.iconosEncabezado}>
-          <TouchableOpacity onPress={() => setModalPerfilVisible(true)}>
-            <Ionicons name="person-outline" size={24} color="#1C252C" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={manejarCerrarSesion}>
-            <Ionicons name="log-out-outline" size={26} color="#1C252C" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.botonIconoHeader}
+          onPress={() => setModalMenuVisible(true)}
+        >
+          <Ionicons name="menu" size={28} color={isDarkMode ? '#F8FAFC' : '#1C252C'} />
+        </TouchableOpacity>
+        
+        <Text style={[styles.titulo, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+          Extracurriculares
+        </Text>
+
+        <View style={{ width: 28 }} />
       </View>
 
       {/* Selector de Unidades */}
@@ -145,10 +145,20 @@ export default function ExtracurricularesScreen() {
           return (
             <TouchableOpacity
               key={unidad}
-              style={[styles.chipUnidad, esActiva && styles.chipUnidadActivo]}
+              style={[
+                styles.chipUnidad,
+                { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+                esActiva && { backgroundColor: isDarkMode ? '#0369A1' : '#BAE6FD' },
+              ]}
               onPress={() => setUnidadActiva(unidad)}
             >
-              <Text style={[styles.textoChipUnidad, esActiva && styles.textoChipUnidadActivo]}>
+              <Text
+                style={[
+                  styles.textoChipUnidad,
+                  { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                  esActiva && { color: isDarkMode ? '#FFFFFF' : '#0369A1' },
+                ]}
+              >
                 {unidad}
               </Text>
             </TouchableOpacity>
@@ -157,10 +167,18 @@ export default function ExtracurricularesScreen() {
       </View>
 
       {/* Buscador */}
-      <View style={styles.contenedorBuscador}>
+      <View
+        style={[
+          styles.contenedorBuscador,
+          {
+            backgroundColor: isDarkMode ? '#1E293B' : 'transparent',
+            borderColor: isDarkMode ? '#334155' : '#38BDF8',
+          },
+        ]}
+      >
         <Ionicons name="search-outline" size={20} color="#94A3B8" />
         <TextInput
-          style={styles.inputBuscador}
+          style={[styles.inputBuscador, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}
           placeholder="Buscar actividad extracurricular"
           placeholderTextColor="#94A3B8"
           value={busqueda}
@@ -170,7 +188,10 @@ export default function ExtracurricularesScreen() {
 
       {/* Botón Agregar Evidencia */}
       <View style={styles.contenedorBotonAgregar}>
-        <TouchableOpacity style={styles.botonAgregar} onPress={() => setModalVisible(true)}>
+        <TouchableOpacity
+          style={[styles.botonAgregar, { backgroundColor: isDarkMode ? '#0284C7' : '#3B82F6' }]}
+          onPress={() => setModalVisible(true)}
+        >
           <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
           <Text style={styles.textoBotonAgregar}>Añadir evidencia</Text>
         </TouchableOpacity>
@@ -179,7 +200,7 @@ export default function ExtracurricularesScreen() {
       {/* Lista de Evidencias */}
       {cargando ? (
         <View style={styles.contenedorVacio}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color={isDarkMode ? '#38BDF8' : '#3B82F6'} />
         </View>
       ) : (
         <FlatList
@@ -194,16 +215,33 @@ export default function ExtracurricularesScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.tarjeta}>
+            <View
+              style={[
+                styles.tarjeta,
+                { backgroundColor: isDarkMode ? '#1E293B' : '#BAE6FD' },
+              ]}
+            >
               <View style={styles.info}>
-                <Text style={styles.nombre}>{item.nombreActividad}</Text>
-                {item.tipoActividad ? <Text style={styles.tipo}>{item.tipoActividad}</Text> : null}
-                <Text style={styles.fecha}>
-                  {new Date(item.creadoEn).toLocaleDateString('es-ES')} · {item.unidad || 'General'}
+                <Text style={[styles.nombre, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                  {item.nombreActividad}
+                </Text>
+                {item.tipoActividad ? (
+                  <Text style={[styles.tipo, { color: isDarkMode ? '#38BDF8' : '#0369A1' }]}>
+                    {item.tipoActividad}
+                  </Text>
+                ) : null}
+                <Text style={[styles.fecha, { color: isDarkMode ? '#94A3B8' : '#475569' }]}>
+                  {new Date(item.creadoEn).toLocaleDateString('es-ES')} {'·'} {item.unidad || 'General'}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.botonEliminar} onPress={() => manejarEliminar(item)}>
-                <Ionicons name="trash-outline" size={20} color="#0F172A" />
+              <TouchableOpacity
+                style={[
+                  styles.botonEliminar,
+                  { backgroundColor: isDarkMode ? '#334155' : 'rgba(255, 255, 255, 0.4)' },
+                ]}
+                onPress={() => manejarEliminar(item)}
+              >
+                <Ionicons name="trash-outline" size={20} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
               </TouchableOpacity>
             </View>
           )}
@@ -220,10 +258,10 @@ export default function ExtracurricularesScreen() {
         onGuardar={manejarGuardar}
       />
 
-      {/* Modal Perfil Docente y Configuración */}
-      <ModalPerfilDocente
-        visible={modalPerfilVisible}
-        onClose={() => setModalPerfilVisible(false)}
+      {/* Menú Lateral (Estilo Facebook) */}
+      <MenuDocente
+        visible={modalMenuVisible}
+        onClose={() => setModalMenuVisible(false)}
         onSincronizacionCompletada={cargarActividades}
       />
     </SafeAreaView>
@@ -231,7 +269,7 @@ export default function ExtracurricularesScreen() {
 }
 
 const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: '#FFFFFF' },
+  contenedor: { flex: 1 },
   encabezado: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,8 +277,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginVertical: 14,
   },
-  titulo: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
-  iconosEncabezado: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  botonIconoHeader: {
+    padding: 4,
+  },
+  titulo: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   contenedorUnidades: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -251,18 +291,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-  },
-  chipUnidadActivo: {
-    backgroundColor: '#BAE6FD',
   },
   textoChipUnidad: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
-  },
-  textoChipUnidadActivo: {
-    color: '#0369A1',
   },
   contenedorBuscador: {
     flexDirection: 'row',
@@ -271,16 +303,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 44,
     borderWidth: 1.5,
-    borderColor: '#38BDF8',
     borderRadius: 22,
     marginBottom: 16,
   },
-  inputBuscador: { flex: 1, marginLeft: 8, fontSize: 14, color: '#0F172A' },
+  inputBuscador: { flex: 1, marginLeft: 8, fontSize: 14 },
   contenedorBotonAgregar: { alignItems: 'flex-end', paddingHorizontal: 16, marginBottom: 16 },
   botonAgregar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 14,
@@ -289,7 +319,6 @@ const styles = StyleSheet.create({
   textoBotonAgregar: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   lista: { paddingHorizontal: 16, paddingBottom: 20 },
   tarjeta: {
-    backgroundColor: '#BAE6FD',
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
@@ -297,10 +326,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   info: { flex: 1, marginRight: 12 },
-  botonEliminar: { padding: 6, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.4)' },
-  nombre: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
-  tipo: { fontSize: 13, color: '#0369A1', fontWeight: '500', marginTop: 2 },
-  fecha: { fontSize: 12, color: '#475569', marginTop: 4 },
+  botonEliminar: { padding: 6, borderRadius: 8 },
+  nombre: { fontSize: 15, fontWeight: '600' },
+  tipo: { fontSize: 13, fontWeight: '500', marginTop: 2 },
+  fecha: { fontSize: 12, marginTop: 4 },
   contenedorVacio: { alignItems: 'center', justifyContent: 'center', marginTop: 60 },
   textoVacio: { color: '#94A3B8', textAlign: 'center', fontSize: 14 },
 });

@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 import { comprimirImagen } from '../../utils/imagenes';
 
 interface ArchivoAdjunto {
@@ -50,6 +51,8 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
   tipos = TIPOS_ACTIVIDAD,
   onGuardar,
 }) => {
+  const { isDarkMode } = useTheme();
+
   const [nombreActividad, setNombreActividad] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [tipoSeleccionado, setTipoSeleccionado] = useState(tipos[0]);
@@ -110,8 +113,7 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
       });
 
       if (!result.canceled && result.assets[0]) {
-                const doc = result.assets[0];
-        // Solo las imágenes se reducen
+        const doc = result.assets[0];
         const esImagen = doc.mimeType?.startsWith('image/');
         setArchivo({
           uri: esImagen ? await comprimirImagen(doc.uri) : doc.uri,
@@ -140,7 +142,7 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
     // Limpieza de campos al cerrar
     setNombreActividad('');
     setDescripcion('');
-   setTipoSeleccionado(tipos[0]);
+    setTipoSeleccionado(tipos[0]);
     setArchivo(null);
     onClose();
   };
@@ -152,18 +154,27 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.pantallaCompleta} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView
+        style={[
+          styles.pantallaCompleta,
+          { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' },
+        ]}
+        edges={['top', 'left', 'right', 'bottom']}
+      >
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
           {/* CABECERA */}
-           <Text style={styles.tituloModal}>{titulo}</Text>
+          <Text style={[styles.tituloModal, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+            {titulo}
+          </Text>
           {(subtitulo || nombreCurso) && (
-            <Text style={styles.subtituloModal}>
+            <Text style={[styles.subtituloModal, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
               {subtitulo ?? `Curso: ${nombreCurso} · ${unidadActual}`}
             </Text>
           )}
+
           {/* ILUSTRACIÓN DE LA MASCOTA */}
           <View style={styles.contenedorMascota}>
             <Image
@@ -174,25 +185,53 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
           </View>
 
           {/* BOTÓN VOLVER CIRCULAR */}
-          <TouchableOpacity style={styles.botonVolver} onPress={onClose}>
-            <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <TouchableOpacity
+            style={[
+              styles.botonVolver,
+              {
+                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                borderColor: isDarkMode ? '#334155' : '#BAE6FD',
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Ionicons name="chevron-back" size={24} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
           </TouchableOpacity>
 
           {/* FORMULARIO */}
           <View style={styles.grupoCampo}>
-            <Text style={styles.label}>Nombre de la Actividad</Text>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Nombre de la Actividad
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
               placeholder=""
+              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
               value={nombreActividad}
               onChangeText={setNombreActividad}
             />
           </View>
 
           <View style={styles.grupoCampo}>
-            <Text style={styles.label}>Descripción (opcional)</Text>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Descripción (opcional)
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                },
+              ]}
               placeholder="Ej: Clase sobre React Navigation"
               placeholderTextColor="#94A3B8"
               value={descripcion}
@@ -202,17 +241,38 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
 
           {/* TIPO DE ACTIVIDAD */}
           <View style={styles.grupoCampo}>
-            <Text style={styles.label}>Tipo de actividad</Text>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Tipo de actividad
+            </Text>
             <View style={styles.contenedorPills}>
               {tipos.map((tipo) => {
                 const activo = tipoSeleccionado === tipo;
                 return (
                   <TouchableOpacity
                     key={tipo}
-                    style={[styles.pillTipo, activo && styles.pillTipoActiva]}
+                    style={[
+                      styles.pillTipo,
+                      { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' },
+                      activo && [
+                        styles.pillTipoActiva,
+                        {
+                          backgroundColor: isDarkMode ? '#172554' : '#E0F2FE',
+                          borderColor: isDarkMode ? '#38BDF8' : '#0284C7',
+                        },
+                      ],
+                    ]}
                     onPress={() => setTipoSeleccionado(tipo)}
                   >
-                    <Text style={[styles.textoPill, activo && styles.textoPillActivo]}>
+                    <Text
+                      style={[
+                        styles.textoPill,
+                        { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                        activo && [
+                          styles.textoPillActivo,
+                          { color: isDarkMode ? '#38BDF8' : '#0284C7' },
+                        ],
+                      ]}
+                    >
                       {tipo}
                     </Text>
                   </TouchableOpacity>
@@ -223,18 +283,32 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
 
           {/* ADJUNTAR ARCHIVOS */}
           <View style={styles.grupoCampo}>
-            <Text style={styles.label}>Adjuntar archivos</Text>
+            <Text style={[styles.label, { color: isDarkMode ? '#E2E8F0' : '#0F172A' }]}>
+              Adjuntar archivos
+            </Text>
 
             {/* ZONA DASHED */}
             <TouchableOpacity
-              style={styles.dropzoneDashed}
+              style={[
+                styles.dropzoneDashed,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                },
+              ]}
               onPress={seleccionarGaleria}
               activeOpacity={0.7}
             >
               {archivo ? (
                 <View style={styles.archivoInfo}>
-                  <Ionicons name="document-attach" size={24} color="#0284C7" />
-                  <Text style={styles.nombreArchivoSeleccionado} numberOfLines={1}>
+                  <Ionicons name="document-attach" size={24} color={isDarkMode ? '#38BDF8' : '#0284C7'} />
+                  <Text
+                    style={[
+                      styles.nombreArchivoSeleccionado,
+                      { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
+                    ]}
+                    numberOfLines={1}
+                  >
                     {archivo.name}
                   </Text>
                   <TouchableOpacity onPress={() => setArchivo(null)}>
@@ -243,11 +317,16 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
                 </View>
               ) : (
                 <>
-                  <Text style={styles.textoDropzonePrincipal}>
+                  <Text
+                    style={[
+                      styles.textoDropzonePrincipal,
+                      { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                    ]}
+                  >
                     Toca para seleccionar fotos o archivos
                   </Text>
-                  <Text style={styles.textoDropzoneSecundario}>
-                    JPG, PNG, PDF · Mág. 10 MB
+                  <Text style={[styles.textoDropzoneSecundario, { color: isDarkMode ? '#64748B' : '#94A3B8' }]}>
+                    JPG, PNG, PDF · Máx. 10 MB
                   </Text>
                 </>
               )}
@@ -255,22 +334,40 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
 
             {/* OPCIONES DE CARGA */}
             <View style={styles.contenedorBotonesAdjuntar}>
-              <TouchableOpacity style={styles.botonAdjuntar} onPress={capturarFoto}>
-                <Text style={styles.textoBotonAdjuntar}>Cámara</Text>
+              <TouchableOpacity
+                style={[styles.botonAdjuntar, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
+                onPress={capturarFoto}
+              >
+                <Text style={[styles.textoBotonAdjuntar, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                  Cámara
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.botonAdjuntar} onPress={seleccionarGaleria}>
-                <Text style={styles.textoBotonAdjuntar}>Galería</Text>
+              <TouchableOpacity
+                style={[styles.botonAdjuntar, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
+                onPress={seleccionarGaleria}
+              >
+                <Text style={[styles.textoBotonAdjuntar, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                  Galería
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.botonAdjuntar} onPress={seleccionarArchivo}>
-                <Text style={styles.textoBotonAdjuntar}>Archivo</Text>
+              <TouchableOpacity
+                style={[styles.botonAdjuntar, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
+                onPress={seleccionarArchivo}
+              >
+                <Text style={[styles.textoBotonAdjuntar, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                  Archivo
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* BOTÓN GUARDAR EVIDENCIA */}
-          <TouchableOpacity style={styles.botonGuardar} onPress={handleGuardar}>
+          <TouchableOpacity
+            style={[styles.botonGuardar, { backgroundColor: isDarkMode ? '#0284C7' : '#2563EB' }]}
+            onPress={handleGuardar}
+          >
             <Text style={styles.textoBotonGuardar}>Guardar evidencia</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -282,7 +379,6 @@ export const ModalSubirEvidencia: React.FC<ModalSubirEvidenciaProps> = ({
 const styles = StyleSheet.create({
   pantallaCompleta: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -292,12 +388,10 @@ const styles = StyleSheet.create({
   tituloModal: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#0F172A',
     textAlign: 'center',
   },
   subtituloModal: {
     fontSize: 13,
-    color: '#64748B',
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 12,
@@ -316,11 +410,9 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 21,
     borderWidth: 1.5,
-    borderColor: '#BAE6FD',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    backgroundColor: '#FFFFFF',
   },
   grupoCampo: {
     marginBottom: 20,
@@ -328,18 +420,14 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#0F172A',
   },
   contenedorPills: {
     flexDirection: 'row',
@@ -349,43 +437,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
   },
   pillTipoActiva: {
-    backgroundColor: '#E0F2FE',
     borderWidth: 1,
-    borderColor: '#0284C7',
   },
   textoPill: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#64748B',
   },
   textoPillActivo: {
-    color: '#0284C7',
     fontWeight: '600',
   },
   dropzoneDashed: {
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
     borderStyle: 'dashed',
     borderRadius: 16,
     paddingVertical: 22,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     marginBottom: 12,
   },
   textoDropzonePrincipal: {
     fontSize: 13,
-    color: '#64748B',
     fontWeight: '500',
     marginBottom: 4,
   },
   textoDropzoneSecundario: {
     fontSize: 11,
-    color: '#94A3B8',
   },
   archivoInfo: {
     flexDirection: 'row',
@@ -394,7 +473,6 @@ const styles = StyleSheet.create({
   },
   nombreArchivoSeleccionado: {
     fontSize: 13,
-    color: '#0F172A',
     fontWeight: '600',
     maxWidth: 200,
   },
@@ -404,7 +482,6 @@ const styles = StyleSheet.create({
   },
   botonAdjuntar: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -412,10 +489,8 @@ const styles = StyleSheet.create({
   textoBotonAdjuntar: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#334155',
   },
   botonGuardar: {
-    backgroundColor: '#2563EB',
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',

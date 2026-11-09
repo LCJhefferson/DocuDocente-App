@@ -14,7 +14,7 @@ export interface ResultadoSincronizacion {
   eliminacionesProcesadas: number;
 }
 
-// Regex estricto para validar UUID v4 de PostgreSQL
+
 const REGEX_UUID_VALIDO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[0-89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
@@ -93,7 +93,6 @@ export const syncService = {
       const cola = await db.select().from(eliminacionesPendientes);
 
       for (const item of cola) {
-        // 1. Borrar archivo de Storage si aplica
         if (item.storagePath) {
           await supabase.storage.from('evidencias-imagenes').remove([item.storagePath]);
         }
@@ -104,7 +103,7 @@ export const syncService = {
           .delete()
           .eq('id', item.registroId);
 
-        // Si se completó o el registro ya no existía en la nube, borramos de la cola local
+        // borrar cola local
         if (!error) {
           await db.delete(eliminacionesPendientes).where(eq(eliminacionesPendientes.id, item.id));
           procesadas++;
@@ -117,7 +116,7 @@ export const syncService = {
   },
 
   /**
-   * Sincronización Bidireccional de Cursos, Evidencias e Imágenes físicas entre SQLite local y Supabase
+   * Sincronización Bidireccional de Cursos, Evidencias e Imágenes
    */
   async sincronizarTodo(cuentaId: string, perfilDocenteId?: string): Promise<ResultadoSincronizacion> {
     const res: ResultadoSincronizacion = {
@@ -131,14 +130,13 @@ export const syncService = {
     if (!cuentaId) return res;
     const idPerfilLocal = perfilDocenteId || cuentaId;
 
-    // ==========================================
-    // 0. PROCESAR COLA DE ELIMINACIONES PENDIENTES
-    // ==========================================
+
+    //PROCESAR COLA DE ELIMINACIONES PENDIENTES
+
     res.eliminacionesProcesadas = await this.procesarEliminacionesPendientes();
 
-    // ==========================================
-    // 1. SINCRONIZAR CURSOS (SUBIDA Y EDICIÓN)
-    // ==========================================
+
+    //SINCRONIZAR CURSOS (SUBIDA Y EDICIÓN)
     const localCursos = await db
       .select()
       .from(cursos)
@@ -216,9 +214,9 @@ export const syncService = {
       }
     }
 
-    // ==========================================
-    // 2. SINCRONIZAR EVIDENCIAS E IMÁGENES FÍSICAS
-    // ==========================================
+
+
+    // =======================2. SINCRONIZAR EVIDENCIAS E IMÁGENES FÍSICAS======================////
     const localEvidencias = await db
       .select()
       .from(evidencias)
@@ -229,7 +227,7 @@ export const syncService = {
         )
       );
 
-    // SUBIR EVIDENCIAS LOCALES Y SUS FOTOS A SUPABASE STORAGE
+    // SUBIR EVIDENCIAS LOCALES
     for (const ev of localEvidencias) {
       let urlPublica = ev.urlRemota;
       const idEvidenciaUuid = REGEX_UUID_VALIDO.test(ev.id) ? ev.id : Crypto.randomUUID();
@@ -280,7 +278,7 @@ export const syncService = {
       }
     }
 
-    // DESCARGAR EVIDENCIAS REMOTAS Y SUS IMÁGENES FÍSICAS AL DISPOSITIVO
+    // DESCARGAR EVIDENCIAS Y IMÁGENES AL DISPOSITIVO
     const { data: remoteEvidencias } = await supabase
       .from('evidencias')
       .select('*')

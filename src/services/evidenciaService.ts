@@ -52,7 +52,7 @@ export const evidenciaService = {
   },
 
   /**
-   * Inserta una nueva evidencia en SQLite asociándole un UUID v4 válido
+   *
    */
   async crearEvidencia(dto: CrearEvidenciaDTO & { perfilDocenteId?: string }) {
     try {

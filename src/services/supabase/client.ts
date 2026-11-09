@@ -2,11 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 
-// Carga de variables de entorno públicas desde el archivo .env
+
 const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
 const rawKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-// Verifica si las credenciales de Supabase están correctamente configuradas
+// Verificar credenciales
 export const esConfigSupabaseValida = Boolean(
   rawUrl && rawKey && rawUrl.startsWith('http')
 );
@@ -18,7 +18,7 @@ if (!esConfigSupabaseValida) {
   );
 }
 
-// Se asigna una URL de respaldo válida para evitar que `createClient` lance un Uncaught Error si faltan las variables
+// URL de respaldo
 const SUPABASE_URL = esConfigSupabaseValida ? rawUrl! : 'https://placeholder-docudocente.supabase.co';
 const SUPABASE_ANON_KEY = esConfigSupabaseValida ? rawKey! : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_key';
 

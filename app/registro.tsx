@@ -1,3 +1,4 @@
+// app/registro.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -17,7 +18,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RequisitosContrasena } from '../src/components/cuenta/RequisitosContrasena';
 import { useAuth } from '../src/context/AuthContext';
-import { esCorreoValido, validarContrasena, validarNombre } from '../src/utils/validaciones';
+import {
+  validarContrasena,
+  validarCorreoDocente,
+  validarNombre,
+} from '../src/utils/validaciones';
 
 export default function RegistroScreen() {
   const router = useRouter();
@@ -60,13 +65,16 @@ export default function RegistroScreen() {
 
   const manejarRegistroFinal = async () => {
     if (enCurso.current) return;
+
     if (!correoElectronico.trim() || !contrasena.trim() || !confirmarContrasena.trim()) {
       Alert.alert('Atención', 'Por favor completa todos los campos obligatorios.');
       return;
     }
 
-    if (!esCorreoValido(correoElectronico)) {
-      Alert.alert('Correo inválido', 'Ingresa un correo válido (ejemplo: nombre@gmail.com).');
+    // Validación estricta de correo institucional para docentes (.edu.pe y alfanumérico)
+    const errorCorreo = validarCorreoDocente(correoElectronico);
+    if (errorCorreo) {
+      Alert.alert('Correo no permitido', errorCorreo);
       return;
     }
 
@@ -87,7 +95,7 @@ export default function RegistroScreen() {
       await registrarse({
         nombreCompleto: nombreCompleto.trim(),
         gradoAcademico: gradoAcademico.trim() || 'Mg.',
-        correoElectronico: correoElectronico.trim(),
+        correoElectronico: correoElectronico.trim().toLowerCase(),
         contrasena,
       });
 
@@ -99,6 +107,12 @@ export default function RegistroScreen() {
       setCargando(false);
     }
   };
+
+  const esRegistroInvalido =
+    cargando ||
+    validarCorreoDocente(correoElectronico) !== null ||
+    validarContrasena(contrasena) !== null ||
+    contrasena !== confirmarContrasena;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -125,7 +139,7 @@ export default function RegistroScreen() {
             />
           </View>
 
-          <Text style={styles.tituloSecundario}>Crear cuenta</Text>
+          <Text style={styles.tituloSecundario}>Crear cuenta de Docente</Text>
 
           {/* PASO 1: Datos Personales */}
           {paso === 1 && (
@@ -137,7 +151,8 @@ export default function RegistroScreen() {
                   value={nombreCompleto}
                   maxLength={120}
                   onChangeText={setNombreCompleto}
-                  placeholder=""
+                  placeholder="Ej. Eder N. Figueroa Piscoya"
+                  placeholderTextColor="#94A3B8"
                 />
               </View>
 
@@ -148,7 +163,8 @@ export default function RegistroScreen() {
                   value={gradoAcademico}
                   maxLength={40}
                   onChangeText={setGradoAcademico}
-                  placeholder="Mg."
+                  placeholder="Mg. / Dr. / Ing."
+                  placeholderTextColor="#94A3B8"
                 />
               </View>
 
@@ -166,7 +182,7 @@ export default function RegistroScreen() {
           {paso === 2 && (
             <View style={styles.formulario}>
               <View style={styles.grupoInput}>
-                <Text style={styles.label}>Correo electrónico *</Text>
+                <Text style={styles.label}>Correo institucional docente (.edu.pe) *</Text>
                 <TextInput
                   style={styles.input}
                   value={correoElectronico}
@@ -175,8 +191,12 @@ export default function RegistroScreen() {
                   onChangeText={setCorreoElectronico}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  placeholder=""
+                  placeholder="efigueroa12@untrm.edu.pe"
+                  placeholderTextColor="#94A3B8"
                 />
+                <Text style={styles.hintText}>
+                  Debe ser correo institucional terminado en .edu.pe e incluir letras y números.
+                </Text>
               </View>
 
               <View style={styles.grupoInput}>
@@ -242,12 +262,10 @@ export default function RegistroScreen() {
               <TouchableOpacity
                 style={[
                   styles.botonPrincipal,
-                  (cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena) && {
-                    opacity: 0.5,
-                  },
+                  esRegistroInvalido && styles.botonDeshabilitado,
                 ]}
                 onPress={manejarRegistroFinal}
-                disabled={cargando || validarContrasena(contrasena) !== null || contrasena !== confirmarContrasena}
+                disabled={esRegistroInvalido}
                 activeOpacity={0.85}
               >
                 {cargando ? (
@@ -311,6 +329,7 @@ const styles = StyleSheet.create({
   formulario: { width: '100%' },
   grupoInput: { marginBottom: 22 },
   label: { fontSize: 13, fontWeight: '500', color: '#83968C', marginBottom: 2 },
+  hintText: { fontSize: 11, color: '#64748B', marginTop: 4 },
   input: {
     borderBottomWidth: 1.2,
     borderBottomColor: '#1E88E5',
@@ -333,6 +352,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
+  },
+  botonDeshabilitado: {
+    opacity: 0.5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   textoBoton: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   contenedorPuntos: {

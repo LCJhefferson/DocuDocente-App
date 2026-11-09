@@ -25,7 +25,7 @@ import { CursoService } from '../../src/services/cursoService';
 
 export default function CursosScreen() {
   const router = useRouter();
-  const { perfilDocente } = useAuth(); // Ya no necesitamos cerrarSesion suelto aquí
+  const { perfilDocente } = useAuth();
   const { isDarkMode } = useTheme();
 
   const [cursosList, setCursosList] = useState<Curso[]>([]);
@@ -35,7 +35,7 @@ export default function CursosScreen() {
   // Modales
   const [modalCrearVisible, setModalCrearVisible] = useState(false);
   const [modalOpcionesVisible, setModalOpcionesVisible] = useState(false);
-  const [modalMenuVisible, setModalMenuVisible] = useState(false); // Estado para el menú lateral
+  const [modalMenuVisible, setModalMenuVisible] = useState(false);
   const [cursoSeleccionado, setCursoSeleccionado] = useState<Curso | null>(null);
 
   const cargarCursos = useCallback(async () => {
@@ -90,29 +90,16 @@ export default function CursosScreen() {
     cargarCursos();
   };
 
-  const manejarEliminarCurso = (curso: Curso) => {
-    Alert.alert(
-      'Eliminar Curso',
-      `¿Está seguro de que desea eliminar "${curso.nombre}"? Esta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await CursoService.eliminarCurso(curso.id, perfilDocente?.id);
-              setModalOpcionesVisible(false);
-              setCursoSeleccionado(null);
-              cargarCursos();
-              Alert.alert('Eliminado', 'El curso y sus evidencias se han eliminado correctamente.');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'No se pudo eliminar el curso.');
-            }
-          },
-        },
-      ]
-    );
+  // ✅ Eliminación directa: El modal estilizado ModalAlerta ya pidió la confirmación del usuario
+  const manejarEliminarCurso = async (curso: Curso) => {
+    try {
+      await CursoService.eliminarCurso(curso.id, perfilDocente?.id);
+      setModalOpcionesVisible(false);
+      setCursoSeleccionado(null);
+      cargarCursos();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo eliminar el curso.');
+    }
   };
 
   const irAEvidenciasCurso = (curso: Curso) => {
@@ -139,7 +126,7 @@ export default function CursosScreen() {
       ]}
       edges={['top', 'left', 'right', 'bottom']}
     >
-      {/* ENCABEZADO SUPERIOR: SOLO EL BOTÓN DE LAS 3 RAYAS */}
+      {/* ENCABEZADO SUPERIOR */}
       <View style={styles.encabezadoSuperior}>
         <TouchableOpacity
           style={styles.botonIconoHeader}
@@ -232,7 +219,7 @@ export default function CursosScreen() {
         <Text style={styles.textoBotonNuevo}>Nuevo Curso</Text>
       </TouchableOpacity>
 
-      {/* MENÚ LATERAL DERECHO (ESTILO FACEBOOK) */}
+      {/* MENÚ LATERAL DERECHO */}
       <MenuDocente
         visible={modalMenuVisible}
         onClose={() => setModalMenuVisible(false)}
@@ -269,7 +256,7 @@ const styles = StyleSheet.create({
   },
   encabezadoSuperior: {
     flexDirection: 'row',
-    justifyContent: 'flex-start', // Alineado a la izquierda para el menú de 3 rayas
+    justifyContent: 'flex-start',
     alignItems: 'center',
     marginTop: 6,
   },
